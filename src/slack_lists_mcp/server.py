@@ -824,6 +824,52 @@ async def update_list(
 
 
 @mcp.tool
+async def delete_list(
+    list_id: Annotated[
+        str,
+        Field(description="The ID of the list to delete"),
+    ],
+    ctx: Context = None,
+) -> dict[str, Any]:
+    """Delete an entire Slack list.
+
+    WARNING: This permanently deletes the list and all its items.
+    This action cannot be undone.
+
+    Args:
+        list_id: The ID of the list to delete
+        ctx: FastMCP context (automatically injected)
+
+    Returns:
+        Deletion confirmation or error information
+
+    """
+    try:
+        if ctx:
+            await ctx.warning(f"Deleting list {list_id} - this cannot be undone!")
+
+        result = await slack_client.delete_list(list_id=list_id)
+
+        if ctx:
+            await ctx.info(f"Successfully deleted list {list_id}")
+
+        return {
+            "success": True,
+            "deleted": True,
+            "list_id": list_id,
+        }
+
+    except Exception as e:
+        logger.error(f"Error deleting list: {e}")
+        if ctx:
+            await ctx.error(f"Failed to delete list: {e!s}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+@mcp.tool
 async def set_list_access(
     list_id: Annotated[
         str,
@@ -1201,6 +1247,7 @@ def get_server_info() -> dict[str, Any]:
             "get_list_structure",
             "create_list",
             "update_list",
+            "delete_list",
             "set_list_access",
             "delete_list_access",
             "start_list_export",

@@ -908,6 +908,26 @@ async def test_update_list_validation_error(mock_slack_client):
 
 
 @pytest.mark.asyncio
+async def test_delete_list(mock_slack_client):
+    """Test deleting an entire list."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={"ok": True},
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    result = await client.delete_list(list_id="F123")
+
+    assert result["deleted"] is True
+    assert result["list_id"] == "F123"
+    mock_slack_client.api_call.assert_called_once_with(
+        api_method="slackLists.delete",
+        json={"id": "F123"},
+    )
+
+
+@pytest.mark.asyncio
 async def test_add_item_with_duplication(mock_slack_client):
     """Test adding an item by duplicating an existing one."""
     mock_slack_client.api_call = MagicMock(

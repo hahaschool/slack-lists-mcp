@@ -27,6 +27,9 @@ class FieldData(BaseModel):
     attachment: list[str] | None = Field(default=None, description="File IDs")
     link: list[dict[str, str]] | None = Field(default=None, description="Link objects")
     reference: list[str] | None = Field(default=None, description="Reference IDs")
+    vote: list[int] | None = Field(default=None, description="Vote values")
+    canvas: list[str] | None = Field(default=None, description="Canvas IDs")
+    message: list[str] | None = Field(default=None, description="Message permalinks")
 
 
 class CellData(BaseModel):
@@ -59,6 +62,9 @@ class CellData(BaseModel):
     attachment: list[str] | None = Field(default=None, description="File IDs")
     link: list[dict[str, str]] | None = Field(default=None, description="Link objects")
     reference: list[str] | None = Field(default=None, description="Reference IDs")
+    vote: list[int] | None = Field(default=None, description="Vote values")
+    canvas: list[str] | None = Field(default=None, description="Canvas IDs")
+    message: list[str] | None = Field(default=None, description="Message permalinks")
 
 
 class AddItemRequest(BaseModel):

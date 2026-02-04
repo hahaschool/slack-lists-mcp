@@ -1359,6 +1359,42 @@ class SlackListsClient:
             logger.error(f"Unexpected error updating list: {e}")
             raise
 
+    async def delete_list(
+        self,
+        list_id: str,
+    ) -> dict[str, Any]:
+        """Delete an entire list.
+
+        WARNING: This permanently deletes the list and all its items.
+        This action cannot be undone.
+
+        Args:
+            list_id: The ID of the list to delete
+
+        Returns:
+            Confirmation of deletion
+
+        """
+        try:
+            response = await self._call_with_retry(
+                api_method="slackLists.delete",
+                json={"id": list_id},
+            )
+
+            if response.get("ok"):
+                return {"deleted": True, "list_id": list_id}
+            raise SlackApiError(
+                message="Failed to delete list",
+                response=response,
+            )
+
+        except SlackApiError as e:
+            error_response = self._handle_api_error(e)
+            raise Exception(f"Failed to delete list: {error_response.error}")
+        except Exception as e:
+            logger.error(f"Unexpected error deleting list: {e}")
+            raise
+
 
 # Create a singleton instance
 slack_client = SlackListsClient()
