@@ -116,6 +116,25 @@ class SlackListsClient:
                     },
                 ]
 
+            # Handle link fields - wrap strings in proper link object format
+            if "link" in normalized_field:
+                link_value = normalized_field["link"]
+                # If it's a string URL, convert to link object
+                if isinstance(link_value, str):
+                    normalized_field["link"] = [{"original_url": link_value}]
+                # If it's a single dict, wrap in array
+                elif isinstance(link_value, dict):
+                    normalized_field["link"] = [link_value]
+                # If it's a list, ensure each element is properly formatted
+                elif isinstance(link_value, list):
+                    formatted_links = []
+                    for item in link_value:
+                        if isinstance(item, str):
+                            formatted_links.append({"original_url": item})
+                        else:
+                            formatted_links.append(item)
+                    normalized_field["link"] = formatted_links
+
             normalized.append(normalized_field)
 
         return normalized
