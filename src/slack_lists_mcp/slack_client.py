@@ -165,22 +165,29 @@ class SlackListsClient:
             for field in initial_fields:
                 if "column_id" not in field:
                     raise ValueError("Each field must have a 'column_id'")
-                if not any(
-                    key in field
-                    for key in [
-                        "text",
-                        "rich_text",
-                        "user",
-                        "select",
-                        "checkbox",
-                        "date",
-                        "number",
-                        "email",
-                        "phone",
-                    ]
-                ):
+                # All supported field types per Slack API documentation
+                supported_field_types = [
+                    "text",  # Converted to rich_text by _normalize_fields
+                    "rich_text",  # Rich text blocks
+                    "user",  # Array of user IDs
+                    "select",  # Array of option IDs
+                    "checkbox",  # Boolean
+                    "date",  # Array of date strings (YYYY-MM-DD)
+                    "number",  # Array of numbers
+                    "email",  # Array of email addresses
+                    "phone",  # Array of phone numbers
+                    "attachment",  # Array of file IDs
+                    "link",  # Array of link objects
+                    "message",  # Array of Slack message permalinks
+                    "rating",  # Array of numeric ratings
+                    "timestamp",  # Array of Unix timestamps
+                    "channel",  # Array of channel IDs
+                    "reference",  # Array of file references
+                ]
+                if not any(key in field for key in supported_field_types):
                     raise ValueError(
-                        f"Field with column_id '{field.get('column_id')}' must have a value (text, rich_text, user, select, etc.)",
+                        f"Field with column_id '{field.get('column_id')}' must have a value. "
+                        f"Supported types: {', '.join(supported_field_types)}",
                     )
 
             # Normalize field formats for better usability
@@ -567,6 +574,22 @@ class SlackListsClient:
             return field["email"]
         if "phone" in field:
             return field["phone"]
+        if "attachment" in field:
+            return field["attachment"]
+        if "link" in field:
+            return field["link"]
+        if "message" in field:
+            return field["message"]
+        if "rating" in field:
+            return field["rating"]
+        if "timestamp" in field:
+            return field["timestamp"]
+        if "channel" in field:
+            return field["channel"]
+        if "reference" in field:
+            return field["reference"]
+        if "rich_text" in field:
+            return field["rich_text"]
         if "value" in field:
             return field["value"]
         return None
