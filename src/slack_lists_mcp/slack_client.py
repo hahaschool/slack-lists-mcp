@@ -468,7 +468,7 @@ class SlackListsClient:
 
         """
         try:
-            response = self.client.api_call(
+            response = await self._call_with_retry(
                 api_method="slackLists.items.delete",
                 json={
                     "list_id": list_id,
@@ -509,7 +509,7 @@ class SlackListsClient:
             if not item_ids:
                 raise ValueError("At least one item ID must be provided")
 
-            response = self.client.api_call(
+            response = await self._call_with_retry(
                 api_method="slackLists.items.deleteMultiple",
                 json={
                     "list_id": list_id,
@@ -557,7 +557,7 @@ class SlackListsClient:
             if include_is_subscribed:
                 params["include_is_subscribed"] = include_is_subscribed
 
-            response = self.client.api_call(
+            response = await self._call_with_retry(
                 api_method="slackLists.items.info",
                 json=params,
             )
@@ -878,7 +878,7 @@ class SlackListsClient:
         """
         try:
             # Use list_items to get basic list info
-            response = self.client.api_call(
+            response = await self._call_with_retry(
                 api_method="slackLists.items.list",
                 json={"list_id": list_id, "limit": 1},
             )
@@ -888,7 +888,7 @@ class SlackListsClient:
                 items = response.get("items", [])
                 if items:
                     # Get first item info which includes list metadata
-                    item_response = self.client.api_call(
+                    item_response = await self._call_with_retry(
                         api_method="slackLists.items.info",
                         json={
                             "list_id": list_id,
@@ -998,7 +998,7 @@ class SlackListsClient:
             if include_copied_list_records is not None:
                 list_data["include_copied_list_records"] = include_copied_list_records
 
-            response = self.client.api_call(
+            response = await self._call_with_retry(
                 api_method="slackLists.create",
                 json=list_data,
             )
@@ -1061,7 +1061,7 @@ class SlackListsClient:
             if channel_ids:
                 request_data["channel_ids"] = channel_ids
 
-            response = self.client.api_call(
+            response = await self._call_with_retry(
                 api_method="slackLists.access.set",
                 json=request_data,
             )
@@ -1113,7 +1113,7 @@ class SlackListsClient:
             if channel_ids:
                 request_data["channel_ids"] = channel_ids
 
-            response = self.client.api_call(
+            response = await self._call_with_retry(
                 api_method="slackLists.access.delete",
                 json=request_data,
             )
@@ -1157,7 +1157,7 @@ class SlackListsClient:
             if include_archived:
                 request_data["include_archived"] = include_archived
 
-            response = self.client.api_call(
+            response = await self._call_with_retry(
                 api_method="slackLists.download.start",
                 json=request_data,
             )
@@ -1199,7 +1199,7 @@ class SlackListsClient:
 
         """
         try:
-            response = self.client.api_call(
+            response = await self._call_with_retry(
                 api_method="slackLists.download.get",
                 json={
                     "list_id": list_id,
@@ -1328,7 +1328,7 @@ class SlackListsClient:
                     "At least one of name, description, or todo_mode must be provided",
                 )
 
-            response = self.client.api_call(
+            response = await self._call_with_retry(
                 api_method="slackLists.update",
                 json=update_data,
             )
