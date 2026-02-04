@@ -664,6 +664,63 @@ class SlackListsClient:
             logger.error(f"Unexpected error listing items: {e}")
             raise
 
+    async def iter_all_items(
+        self,
+        list_id: str,
+        limit: int = 100,
+        archived: bool | None = None,
+        filters: dict[str, dict[str, Any]] | None = None,
+    ):
+        """Iterate through all items in a list with automatic pagination.
+
+        This is an async generator that automatically handles pagination,
+        yielding items one at a time until all items have been retrieved.
+
+        Args:
+            list_id: The ID of the list
+            limit: Number of items per page (default: 100)
+            archived: Whether to return archived items (True) or normal items (False/None)
+            filters: Dictionary of column filters (same as list_items)
+
+        Yields:
+            Individual item dictionaries
+
+        Example:
+            async for item in client.iter_all_items("F123"):
+                print(item["id"])
+
+            # With filters
+            async for item in client.iter_all_items(
+                "F123",
+                filters={"status": {"equals": "active"}}
+            ):
+                process_item(item)
+
+            # Collect all items into a list
+            all_items = [item async for item in client.iter_all_items("F123")]
+
+        """
+        cursor = None
+
+        while True:
+            result = await self.list_items(
+                list_id=list_id,
+                limit=limit,
+                cursor=cursor,
+                archived=archived,
+                filters=filters,
+            )
+
+            for item in result.get("items", []):
+                yield item
+
+            if not result.get("has_more"):
+                break
+
+            cursor = result.get("next_cursor")
+            if not cursor:
+                break
+
     def _matches_filters(
         self,
         item: dict[str, Any],

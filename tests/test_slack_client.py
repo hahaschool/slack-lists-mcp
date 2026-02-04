@@ -975,3 +975,77 @@ async def test_link_field_normalization():
         {"original_url": "https://example1.com"},
         {"original_url": "https://example2.com"},
     ]
+
+
+@pytest.mark.asyncio
+async def test_iter_all_items_single_page(mock_slack_client):
+    """Test iterating items when all fit in one page."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={
+            "ok": True,
+            "items": [
+                {"id": "Rec1", "fields": []},
+                {"id": "Rec2", "fields": []},
+            ],
+            "response_metadata": {"next_cursor": ""},
+        },
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    items = [item async for item in client.iter_all_items("F123")]
+
+    assert len(items) == 2
+    assert items[0]["id"] == "Rec1"
+    assert items[1]["id"] == "Rec2"
+    mock_slack_client.api_call.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_iter_all_items_multiple_pages(mock_slack_client):
+    """Test iterating items across multiple pages."""
+    # Setup mock to return two pages
+    mock_slack_client.api_call = MagicMock(
+        side_effect=[
+            {
+                "ok": True,
+                "items": [{"id": "Rec1"}, {"id": "Rec2"}],
+                "response_metadata": {"next_cursor": "cursor_page_2"},
+            },
+            {
+                "ok": True,
+                "items": [{"id": "Rec3"}, {"id": "Rec4"}],
+                "response_metadata": {"next_cursor": ""},
+            },
+        ],
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    items = [item async for item in client.iter_all_items("F123", limit=2)]
+
+    assert len(items) == 4
+    assert [item["id"] for item in items] == ["Rec1", "Rec2", "Rec3", "Rec4"]
+    assert mock_slack_client.api_call.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_iter_all_items_empty_list(mock_slack_client):
+    """Test iterating an empty list."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={
+            "ok": True,
+            "items": [],
+            "response_metadata": {"next_cursor": ""},
+        },
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    items = [item async for item in client.iter_all_items("F123")]
+
+    assert len(items) == 0
+    mock_slack_client.api_call.assert_called_once()
