@@ -476,4 +476,5 @@ async def test_error_handling(mock_slack_client):
             initial_fields=[{"column_id": "Col123", "text": "Test"}],
         )
 
-    assert "list_not_found" in str(exc_info.value)
+    # Check for human-readable error message
+    assert "List not found" in str(exc_info.value)
