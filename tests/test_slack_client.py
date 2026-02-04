@@ -799,6 +799,77 @@ async def test_get_export_url_processing(mock_slack_client):
 
 
 @pytest.mark.asyncio
+async def test_wait_for_export_success(mock_slack_client):
+    """Test waiting for export to complete successfully."""
+    # First call returns processing, second returns completed
+    mock_slack_client.api_call = MagicMock(
+        side_effect=[
+            {"ok": True, "download_url": None},
+            {"ok": True, "download_url": "https://files.slack.com/export.csv"},
+        ],
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    result = await client.wait_for_export(
+        list_id="F123",
+        job_id="LeF123456",
+        timeout=10,
+        poll_interval=0.01,  # Short interval for faster test
+    )
+
+    assert result["download_url"] == "https://files.slack.com/export.csv"
+    assert result["status"] == "completed"
+    assert mock_slack_client.api_call.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_wait_for_export_immediate_success(mock_slack_client):
+    """Test wait_for_export when export is already complete."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={
+            "ok": True,
+            "download_url": "https://files.slack.com/export.csv",
+        },
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    result = await client.wait_for_export(
+        list_id="F123",
+        job_id="LeF123456",
+    )
+
+    assert result["download_url"] == "https://files.slack.com/export.csv"
+    assert result["status"] == "completed"
+    assert mock_slack_client.api_call.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_wait_for_export_timeout(mock_slack_client):
+    """Test wait_for_export times out when export never completes."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={"ok": True, "download_url": None},
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    with pytest.raises(TimeoutError) as exc_info:
+        await client.wait_for_export(
+            list_id="F123",
+            job_id="LeF123456",
+            timeout=0.05,  # Very short timeout
+            poll_interval=0.01,
+        )
+
+    assert "did not complete within" in str(exc_info.value)
+    assert "LeF123456" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
 async def test_update_list(mock_slack_client):
     """Test updating list properties."""
     mock_slack_client.api_call = MagicMock(
