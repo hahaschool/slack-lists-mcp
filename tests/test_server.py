@@ -479,6 +479,7 @@ async def test_default_list_id_from_env():
                     list_id="default_list_123",
                     initial_fields=[{"column_id": "Col123", "text": "Test Item"}],
                     duplicated_item_id=None,
+                    parent_item_id=None,
                 )
 
 
@@ -535,4 +536,5 @@ async def test_list_id_parameter_override():
                     list_id="explicit_list_456",
                     initial_fields=[{"column_id": "Col123", "text": "Test Item"}],
                     duplicated_item_id=None,
+                    parent_item_id=None,
                 )

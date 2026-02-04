@@ -58,6 +58,15 @@ async def add_list_item(
             ),
         ),
     ] = None,
+    parent_item_id: Annotated[
+        str | None,
+        Field(
+            description=(
+                "ID of a parent item to create a subtask under. When provided, "
+                "the new item becomes a subtask of the specified parent."
+            ),
+        ),
+    ] = None,
     list_id: str | None = None,
     ctx: Context = None,
 ) -> dict[str, Any]:
@@ -71,6 +80,7 @@ async def add_list_item(
                        - Value in appropriate format (text, rich_text, user, date, select, checkbox, etc.)
                        Can be omitted when using duplicated_item_id.
         duplicated_item_id: ID of an existing item to duplicate. Creates a copy of the item.
+        parent_item_id: ID of a parent item to create a subtask under.
         list_id: The ID of the list (optional, uses DEFAULT_LIST_ID env var if not provided)
                  When DEFAULT_LIST_ID is set, you can omit this parameter entirely
         ctx: FastMCP context (automatically injected)
@@ -87,6 +97,9 @@ async def add_list_item(
 
         # Or duplicate an existing item
         duplicated_item_id = "Rec12345678"
+
+        # Or create a subtask under a parent
+        parent_item_id = "Rec87654321"
 
     """
     try:
@@ -109,6 +122,8 @@ async def add_list_item(
         if ctx:
             if duplicated_item_id:
                 await ctx.info(f"Duplicating item {duplicated_item_id} in list {list_id}")
+            elif parent_item_id:
+                await ctx.info(f"Creating subtask under {parent_item_id} in list {list_id}")
             else:
                 await ctx.info(
                     f"Adding item to list {list_id} with {len(initial_fields or [])} fields",
@@ -118,6 +133,7 @@ async def add_list_item(
             list_id=list_id,
             initial_fields=initial_fields,
             duplicated_item_id=duplicated_item_id,
+            parent_item_id=parent_item_id,
         )
 
         if ctx:
