@@ -250,15 +250,15 @@ class SlackListsClient:
         list_id: str,
         cells: list[dict[str, Any]],
     ) -> dict[str, Any]:
-        """Update items in a list.
+        """Update items in a list, or create new items via row_id_to_create.
 
         Use get_list_structure first to understand the column IDs and types.
 
         Args:
             list_id: The ID of the list
-            cells: List of cell dictionaries with row_id, column_id and appropriate value format.
-                   Each cell must have:
-                   - row_id: The item/row ID to update
+            cells: List of cell dictionaries. Each cell must have:
+                   - row_id: The item/row ID to update (for existing rows)
+                   - OR row_id_to_create: true (to create a new row)
                    - column_id: The column ID
                    - One of: rich_text, user, date, select, checkbox, number, email, phone, etc.
 
@@ -266,6 +266,7 @@ class SlackListsClient:
             Success indicator
 
         Example:
+            # Update existing items
             cells = [
                 {
                     "row_id": "Rec123",
@@ -282,16 +283,20 @@ class SlackListsClient:
                     "row_id": "Rec123",
                     "column_id": "Col456",
                     "checkbox": True
+                }
+            ]
+
+            # Create new items using row_id_to_create
+            cells = [
+                {
+                    "row_id_to_create": True,
+                    "column_id": "Col123",
+                    "text": "New Task Name"
                 },
                 {
-                    "row_id": "Rec123",
-                    "column_id": "Col789",
-                    "select": ["OptABC123"]  # select fields expect an array
-                },
-                {
-                    "row_id": "Rec123",
-                    "column_id": "Col012",
-                    "user": ["U123456"]  # user fields expect an array
+                    "row_id_to_create": True,
+                    "column_id": "Col456",
+                    "select": ["OptABC123"]
                 }
             ]
 
@@ -299,6 +304,13 @@ class SlackListsClient:
         try:
             if not cells:
                 raise ValueError("At least one cell must be provided")
+
+            # Validate that each cell has either row_id or row_id_to_create
+            for cell in cells:
+                if "row_id" not in cell and not cell.get("row_id_to_create"):
+                    raise ValueError(
+                        "Each cell must have either 'row_id' or 'row_id_to_create: true'"
+                    )
 
             # Normalize field formats for better usability
             normalized_cells = self._normalize_fields(cells)

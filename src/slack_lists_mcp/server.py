@@ -161,16 +161,17 @@ async def update_list_item(
         list[dict[str, Any]],
         Field(
             description=(
-                "List of cell dictionaries. Each cell MUST have "
-                "'row_id', 'column_id', and a value field. "
+                "List of cell dictionaries. Each cell MUST have either "
+                "'row_id' (to update existing) OR 'row_id_to_create: true' (to create new), "
+                "plus 'column_id' and a value field. "
                 "Supported value fields: 'text' (string), "
                 "'user' (list of user IDs), "
                 "'date' (list of date strings), "
                 "'select' (list of option IDs), "
                 "'checkbox' (boolean), 'number' (list of numbers), etc. "
                 "Use get_list_structure to find correct column IDs. "
-                "Example: [{'row_id': 'Rec123', "
-                "'column_id': 'Col123', 'text': 'Updated name'}]"
+                "Example update: [{'row_id': 'Rec123', 'column_id': 'Col123', 'text': 'Updated name'}]. "
+                "Example create: [{'row_id_to_create': true, 'column_id': 'Col123', 'text': 'New item'}]"
             ),
             min_length=1,
         ),
@@ -178,13 +179,14 @@ async def update_list_item(
     list_id: str | None = None,
     ctx: Context = None,
 ) -> dict[str, Any]:
-    """Update items in a Slack list.
+    """Update items in a Slack list, or create new items via row_id_to_create.
 
     Use get_list_structure first to understand the column IDs and types.
 
     Args:
         cells: List of cell dictionaries. Each cell needs:
-               - row_id: The item ID to update
+               - row_id: The item ID to update (for existing items)
+               - OR row_id_to_create: true (to create a new item)
                - column_id: The column ID
                - Value in appropriate format (rich_text, user, date, select, checkbox, etc.)
         list_id: The ID of the list (optional, uses DEFAULT_LIST_ID env var if not provided)
@@ -194,6 +196,12 @@ async def update_list_item(
     Returns:
         Success status or error information
 
+    Example:
+        # Update existing item
+        cells = [{"row_id": "Rec123", "column_id": "Col456", "text": "Updated value"}]
+
+        # Create new item via update endpoint
+        cells = [{"row_id_to_create": true, "column_id": "Col456", "text": "New item"}]
 
     """
     try:

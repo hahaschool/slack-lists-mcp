@@ -32,7 +32,14 @@ class FieldData(BaseModel):
 class CellData(BaseModel):
     """Cell data for updating list items."""
 
-    row_id: str = Field(description="The item/row ID to update")
+    row_id: str | None = Field(
+        default=None,
+        description="The item/row ID to update (required for updates)",
+    )
+    row_id_to_create: bool | None = Field(
+        default=None,
+        description="Set to true to create a new row instead of updating",
+    )
     column_id: str = Field(description="The column ID")
     # Dynamic field based on column type (same as FieldData)
     rich_text: list[dict[str, Any]] | None = Field(
