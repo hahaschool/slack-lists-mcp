@@ -538,6 +538,68 @@ async def get_list_structure(
         }
 
 
+@mcp.tool
+async def create_list(
+    name: Annotated[
+        str,
+        Field(description="Name of the list to create"),
+    ],
+    channel_id: Annotated[
+        str,
+        Field(description="Channel ID where the list will be created"),
+    ],
+    description: Annotated[
+        str | None,
+        Field(description="Optional description for the list"),
+    ] = None,
+    is_private: Annotated[
+        bool,
+        Field(description="Whether the list should be private (default: False)"),
+    ] = False,
+    ctx: Context = None,
+) -> dict[str, Any]:
+    """Create a new Slack list.
+
+    Args:
+        name: Name of the list to create
+        channel_id: Channel ID where the list will be created
+        description: Optional description for the list
+        is_private: Whether the list should be private
+        ctx: FastMCP context (automatically injected)
+
+    Returns:
+        The created list data or error information
+
+    """
+    try:
+        if ctx:
+            await ctx.info(f"Creating list '{name}' in channel {channel_id}")
+
+        result = await slack_client.create_list(
+            name=name,
+            channel_id=channel_id,
+            description=description,
+            is_private=is_private,
+        )
+
+        if ctx:
+            await ctx.info(f"Successfully created list: {result.get('id', 'unknown')}")
+
+        return {
+            "success": True,
+            "list": result,
+        }
+
+    except Exception as e:
+        logger.error(f"Error creating list: {e}")
+        if ctx:
+            await ctx.error(f"Failed to create list: {e!s}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
 # Add a resource to show server information
 @mcp.resource("resource://server/info")
 def get_server_info() -> dict[str, Any]:
@@ -558,6 +620,7 @@ def get_server_info() -> dict[str, Any]:
             "list_items",
             "get_list_info",
             "get_list_structure",
+            "create_list",
         ],
     }
 
