@@ -478,3 +478,500 @@ async def test_error_handling(mock_slack_client):
 
     # Check for human-readable error message
     assert "List not found" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_create_list_with_todo_mode(mock_slack_client):
+    """Test creating a list with todo mode enabled."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={
+            "ok": True,
+            "list": {
+                "id": "F123",
+                "name": "My Tasks",
+            },
+        },
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    result = await client.create_list(
+        name="My Tasks",
+        todo_mode=True,
+    )
+
+    assert result["id"] == "F123"
+    mock_slack_client.api_call.assert_called_once_with(
+        api_method="slackLists.create",
+        json={
+            "name": "My Tasks",
+            "todo_mode": True,
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_create_list_with_schema(mock_slack_client):
+    """Test creating a list with custom schema."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={
+            "ok": True,
+            "list": {
+                "id": "F123",
+                "name": "Custom List",
+            },
+        },
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    schema = [
+        {"key": "task", "name": "Task", "type": "text", "is_primary_column": True},
+        {"key": "status", "name": "Status", "type": "select"},
+    ]
+
+    result = await client.create_list(
+        name="Custom List",
+        schema=schema,
+    )
+
+    assert result["id"] == "F123"
+    mock_slack_client.api_call.assert_called_once_with(
+        api_method="slackLists.create",
+        json={
+            "name": "Custom List",
+            "schema": schema,
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_create_list_copy_from_existing(mock_slack_client):
+    """Test duplicating an existing list."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={
+            "ok": True,
+            "list": {
+                "id": "F456",
+                "name": "Copied List",
+            },
+        },
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    result = await client.create_list(
+        copy_from_list_id="F123",
+        include_copied_list_records=True,
+    )
+
+    assert result["id"] == "F456"
+    mock_slack_client.api_call.assert_called_once_with(
+        api_method="slackLists.create",
+        json={
+            "copy_from_list_id": "F123",
+            "include_copied_list_records": True,
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_set_access_for_users(mock_slack_client):
+    """Test setting access for users."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={"ok": True},
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    result = await client.set_access(
+        list_id="F123",
+        access_level="write",
+        user_ids=["U123", "U456"],
+    )
+
+    assert result["success"] is True
+    mock_slack_client.api_call.assert_called_once_with(
+        api_method="slackLists.access.set",
+        json={
+            "list_id": "F123",
+            "access_level": "write",
+            "user_ids": ["U123", "U456"],
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_set_access_for_channels(mock_slack_client):
+    """Test setting access for channels."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={"ok": True},
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    result = await client.set_access(
+        list_id="F123",
+        access_level="read",
+        channel_ids=["C123"],
+    )
+
+    assert result["success"] is True
+    mock_slack_client.api_call.assert_called_once_with(
+        api_method="slackLists.access.set",
+        json={
+            "list_id": "F123",
+            "access_level": "read",
+            "channel_ids": ["C123"],
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_set_access_validation_errors(mock_slack_client):
+    """Test set_access validation errors."""
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    # Neither user_ids nor channel_ids provided
+    with pytest.raises(ValueError) as exc_info:
+        await client.set_access(list_id="F123", access_level="read")
+    assert "Either user_ids or channel_ids must be provided" in str(exc_info.value)
+
+    # Both user_ids and channel_ids provided
+    with pytest.raises(ValueError) as exc_info:
+        await client.set_access(
+            list_id="F123",
+            access_level="read",
+            user_ids=["U123"],
+            channel_ids=["C123"],
+        )
+    assert "Cannot specify both user_ids and channel_ids" in str(exc_info.value)
+
+    # Invalid access level
+    with pytest.raises(ValueError) as exc_info:
+        await client.set_access(
+            list_id="F123",
+            access_level="invalid",
+            user_ids=["U123"],
+        )
+    assert "access_level must be" in str(exc_info.value)
+
+    # Owner access with channels
+    with pytest.raises(ValueError) as exc_info:
+        await client.set_access(
+            list_id="F123",
+            access_level="owner",
+            channel_ids=["C123"],
+        )
+    assert "'owner' access level only works with user_ids" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_delete_access_for_users(mock_slack_client):
+    """Test deleting access for users."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={"ok": True},
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    result = await client.delete_access(
+        list_id="F123",
+        user_ids=["U123", "U456"],
+    )
+
+    assert result["success"] is True
+    mock_slack_client.api_call.assert_called_once_with(
+        api_method="slackLists.access.delete",
+        json={
+            "list_id": "F123",
+            "user_ids": ["U123", "U456"],
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_delete_access_validation_errors(mock_slack_client):
+    """Test delete_access validation errors."""
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    # Neither user_ids nor channel_ids provided
+    with pytest.raises(ValueError) as exc_info:
+        await client.delete_access(list_id="F123")
+    assert "Either user_ids or channel_ids must be provided" in str(exc_info.value)
+
+    # Both user_ids and channel_ids provided
+    with pytest.raises(ValueError) as exc_info:
+        await client.delete_access(
+            list_id="F123",
+            user_ids=["U123"],
+            channel_ids=["C123"],
+        )
+    assert "Cannot specify both user_ids and channel_ids" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_start_export(mock_slack_client):
+    """Test starting a list export job."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={
+            "ok": True,
+            "job_id": "LeF123456",
+        },
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    result = await client.start_export(
+        list_id="F123",
+        include_archived=True,
+    )
+
+    assert result["job_id"] == "LeF123456"
+    assert result["status"] == "started"
+    mock_slack_client.api_call.assert_called_once_with(
+        api_method="slackLists.download.start",
+        json={
+            "list_id": "F123",
+            "include_archived": True,
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_export_url_completed(mock_slack_client):
+    """Test getting export URL when job is completed."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={
+            "ok": True,
+            "download_url": "https://files.slack.com/download/...",
+        },
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    result = await client.get_export_url(
+        list_id="F123",
+        job_id="LeF123456",
+    )
+
+    assert result["download_url"] == "https://files.slack.com/download/..."
+    assert result["status"] == "completed"
+    mock_slack_client.api_call.assert_called_once_with(
+        api_method="slackLists.download.get",
+        json={
+            "list_id": "F123",
+            "job_id": "LeF123456",
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_export_url_processing(mock_slack_client):
+    """Test getting export URL when job is still processing."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={
+            "ok": True,
+            "download_url": None,
+        },
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    result = await client.get_export_url(
+        list_id="F123",
+        job_id="LeF123456",
+    )
+
+    assert result["download_url"] is None
+    assert result["status"] == "processing"
+
+
+@pytest.mark.asyncio
+async def test_update_list(mock_slack_client):
+    """Test updating list properties."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={"ok": True},
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    result = await client.update_list(
+        list_id="F123",
+        name="New Name",
+        description="New description",
+        todo_mode=True,
+    )
+
+    assert result["success"] is True
+    call_args = mock_slack_client.api_call.call_args
+    assert call_args[1]["api_method"] == "slackLists.update"
+    assert call_args[1]["json"]["id"] == "F123"
+    assert call_args[1]["json"]["name"] == "New Name"
+    assert call_args[1]["json"]["todo_mode"] is True
+
+
+@pytest.mark.asyncio
+async def test_update_list_validation_error(mock_slack_client):
+    """Test update_list requires at least one field."""
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    with pytest.raises(ValueError) as exc_info:
+        await client.update_list(list_id="F123")
+    assert "At least one of name, description, or todo_mode must be provided" in str(
+        exc_info.value
+    )
+
+
+@pytest.mark.asyncio
+async def test_add_item_with_duplication(mock_slack_client):
+    """Test adding an item by duplicating an existing one."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={
+            "ok": True,
+            "item": {
+                "id": "Rec456",
+                "list_id": "F123",
+            },
+        },
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    result = await client.add_item(
+        list_id="F123",
+        duplicated_item_id="Rec123",
+    )
+
+    assert result["id"] == "Rec456"
+    mock_slack_client.api_call.assert_called_once_with(
+        api_method="slackLists.items.create",
+        json={
+            "list_id": "F123",
+            "duplicated_item_id": "Rec123",
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_add_item_with_parent(mock_slack_client):
+    """Test adding an item as a subtask."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={
+            "ok": True,
+            "item": {
+                "id": "Rec456",
+                "list_id": "F123",
+            },
+        },
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    result = await client.add_item(
+        list_id="F123",
+        initial_fields=[{"column_id": "Col123", "text": "Subtask"}],
+        parent_item_id="Rec123",
+    )
+
+    assert result["id"] == "Rec456"
+    call_args = mock_slack_client.api_call.call_args
+    assert call_args[1]["json"]["parent_item_id"] == "Rec123"
+
+
+@pytest.mark.asyncio
+async def test_add_item_validation_errors(mock_slack_client):
+    """Test add_item validation errors."""
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    # Neither initial_fields nor duplicated_item_id provided
+    with pytest.raises(ValueError) as exc_info:
+        await client.add_item(list_id="F123")
+    assert "Either initial_fields or duplicated_item_id must be provided" in str(
+        exc_info.value
+    )
+
+
+@pytest.mark.asyncio
+async def test_delete_items_batch(mock_slack_client):
+    """Test deleting multiple items at once."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={"ok": True},
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    result = await client.delete_items(
+        list_id="F123",
+        item_ids=["Rec1", "Rec2", "Rec3"],
+    )
+
+    assert result["deleted"] is True
+    assert result["count"] == 3
+    mock_slack_client.api_call.assert_called_once_with(
+        api_method="slackLists.items.deleteMultiple",
+        json={
+            "list_id": "F123",
+            "ids": ["Rec1", "Rec2", "Rec3"],
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_delete_items_validation_error(mock_slack_client):
+    """Test delete_items requires at least one item."""
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    with pytest.raises(ValueError) as exc_info:
+        await client.delete_items(list_id="F123", item_ids=[])
+    assert "At least one item ID must be provided" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_link_field_normalization():
+    """Test link field normalization."""
+    client = SlackListsClient()
+
+    # Test string URL normalization
+    fields = [{"column_id": "Col1", "link": "https://example.com"}]
+    normalized = client._normalize_fields(fields)
+    assert normalized[0]["link"] == [{"original_url": "https://example.com"}]
+
+    # Test dict normalization
+    fields = [{"column_id": "Col1", "link": {"original_url": "https://example.com"}}]
+    normalized = client._normalize_fields(fields)
+    assert normalized[0]["link"] == [{"original_url": "https://example.com"}]
+
+    # Test mixed list normalization
+    fields = [
+        {
+            "column_id": "Col1",
+            "link": [
+                "https://example1.com",
+                {"original_url": "https://example2.com"},
+            ],
+        }
+    ]
+    normalized = client._normalize_fields(fields)
+    assert normalized[0]["link"] == [
+        {"original_url": "https://example1.com"},
+        {"original_url": "https://example2.com"},
+    ]
