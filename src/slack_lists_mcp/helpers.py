@@ -126,6 +126,109 @@ def make_number(numbers: int | float | list[int | float]) -> list[float]:
     return [float(n) for n in numbers]
 
 
+def make_checkbox(checked: bool) -> bool:
+    """Create a properly formatted checkbox field value.
+
+    Args:
+        checked: Whether the checkbox is checked
+
+    Returns:
+        Boolean value ready for Slack API
+
+    Example:
+        >>> field = {"column_id": "Col123", "checkbox": make_checkbox(True)}
+
+    """
+    return bool(checked)
+
+
+def make_rating(rating: int) -> list[int]:
+    """Create a properly formatted rating field value.
+
+    Args:
+        rating: Rating value (typically 1-5)
+
+    Returns:
+        List containing the rating value ready for Slack API
+
+    Example:
+        >>> field = {"column_id": "Col123", "rating": make_rating(4)}
+
+    """
+    return [int(rating)]
+
+
+def make_timestamp(unix_timestamp: int | float) -> list[int]:
+    """Create a properly formatted timestamp field value.
+
+    Args:
+        unix_timestamp: Unix timestamp in seconds
+
+    Returns:
+        List containing the timestamp ready for Slack API
+
+    Example:
+        >>> import time
+        >>> field = {"column_id": "Col123", "timestamp": make_timestamp(int(time.time()))}
+
+    """
+    return [int(unix_timestamp)]
+
+
+def make_channel(channel_ids: str | list[str]) -> list[str]:
+    """Create a properly formatted channel field value.
+
+    Args:
+        channel_ids: Single channel ID or list of channel IDs
+
+    Returns:
+        List of channel IDs ready for Slack API
+
+    Example:
+        >>> field = {"column_id": "Col123", "channel": make_channel("C123456")}
+
+    """
+    if isinstance(channel_ids, str):
+        return [channel_ids]
+    return list(channel_ids)
+
+
+def make_email(emails: str | list[str]) -> list[str]:
+    """Create a properly formatted email field value.
+
+    Args:
+        emails: Single email or list of emails
+
+    Returns:
+        List of emails ready for Slack API
+
+    Example:
+        >>> field = {"column_id": "Col123", "email": make_email("user@example.com")}
+
+    """
+    if isinstance(emails, str):
+        return [emails]
+    return list(emails)
+
+
+def make_phone(phones: str | list[str]) -> list[str]:
+    """Create a properly formatted phone field value.
+
+    Args:
+        phones: Single phone number or list of phone numbers
+
+    Returns:
+        List of phone numbers ready for Slack API
+
+    Example:
+        >>> field = {"column_id": "Col123", "phone": make_phone("+1-555-1234")}
+
+    """
+    if isinstance(phones, str):
+        return [phones]
+    return list(phones)
+
+
 def make_field(
     column_id: str,
     value: Any,
@@ -139,7 +242,8 @@ def make_field(
     Args:
         column_id: The column ID from list structure
         value: The value to set (auto-formatted based on field_type)
-        field_type: One of: text, select, user, date, number, checkbox, link, email, phone
+        field_type: One of: text, select, user, date, number, checkbox,
+                   link, email, phone, rating, timestamp, channel
 
     Returns:
         Complete field dictionary ready for initial_fields or cells
@@ -149,6 +253,7 @@ def make_field(
         ...     make_field("Col1", "Task Name", "text"),
         ...     make_field("Col2", "U123456", "user"),
         ...     make_field("Col3", True, "checkbox"),
+        ...     make_field("Col4", 4, "rating"),
         ... ]
 
     """
@@ -164,6 +269,12 @@ def make_field(
         field["date"] = make_date(value)
     elif field_type == "number":
         field["number"] = make_number(value)
+    elif field_type == "rating":
+        field["rating"] = make_rating(value)
+    elif field_type == "timestamp":
+        field["timestamp"] = make_timestamp(value)
+    elif field_type == "channel":
+        field["channel"] = make_channel(value)
     elif field_type == "checkbox":
         field["checkbox"] = bool(value)
     elif field_type == "link":
