@@ -478,6 +478,7 @@ async def test_default_list_id_from_env():
                 mock_client.add_item.assert_called_once_with(
                     list_id="default_list_123",
                     initial_fields=[{"column_id": "Col123", "text": "Test Item"}],
+                    duplicated_item_id=None,
                 )
 
 
@@ -533,4 +534,5 @@ async def test_list_id_parameter_override():
                 mock_client.add_item.assert_called_once_with(
                     list_id="explicit_list_456",
                     initial_fields=[{"column_id": "Col123", "text": "Test Item"}],
+                    duplicated_item_id=None,
                 )
