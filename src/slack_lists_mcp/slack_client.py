@@ -738,33 +738,84 @@ class SlackListsClient:
 
     async def create_list(
         self,
-        name: str,
-        channel_id: str,
+        name: str | None = None,
         description: str | None = None,
-        is_private: bool = False,
+        todo_mode: bool | None = None,
+        schema: list[dict[str, Any]] | None = None,
+        copy_from_list_id: str | None = None,
+        include_copied_list_records: bool | None = None,
     ) -> dict[str, Any]:
         """Create a new list.
 
         Args:
             name: Name of the list
-            channel_id: Channel ID where the list will be created
-            description: Optional description
-            is_private: Whether the list should be private
+            description: Optional description (converted to rich text blocks)
+            todo_mode: When True, creates list with Completed, Assignee, and Due Date
+                      columns for task tracking
+            schema: Column definitions for the list structure. Each column should have:
+                   - key: Column identifier string
+                   - name: Display name for the column
+                   - type: Column type (text, number, select, date, user, checkbox, etc.)
+                   - is_primary_column: (optional) Set True for primary text column
+                   - options: (optional) Column configuration (choices for select, etc.)
+            copy_from_list_id: ID of an existing list to duplicate
+            include_copied_list_records: When True and copying from another list,
+                                        includes the records from that list
 
         Returns:
             The created list data
 
+        Example:
+            # Create a simple list with todo mode
+            create_list(name="My Tasks", todo_mode=True)
+
+            # Create a list with custom schema
+            create_list(
+                name="Project Tracker",
+                schema=[
+                    {"key": "task_name", "name": "Task", "type": "text", "is_primary_column": True},
+                    {"key": "status", "name": "Status", "type": "select", "options": {
+                        "choices": [
+                            {"key": "todo", "value": "To Do", "color": "gray"},
+                            {"key": "in_progress", "value": "In Progress", "color": "blue"},
+                            {"key": "done", "value": "Done", "color": "green"}
+                        ]
+                    }},
+                    {"key": "assignee", "name": "Assignee", "type": "user"},
+                    {"key": "due", "name": "Due Date", "type": "date"}
+                ]
+            )
+
+            # Duplicate an existing list with its records
+            create_list(copy_from_list_id="F1234567890", include_copied_list_records=True)
+
         """
         try:
-            list_data = {
-                "name": name,
-                "channel_id": channel_id,
-            }
+            list_data: dict[str, Any] = {}
 
+            if name:
+                list_data["name"] = name
             if description:
-                list_data["description"] = description
-            if is_private:
-                list_data["is_private"] = is_private
+                # Convert plain text to description_blocks format
+                list_data["description_blocks"] = [
+                    {
+                        "type": "rich_text",
+                        "elements": [
+                            {
+                                "type": "rich_text_section",
+                                "elements": [{"type": "text", "text": description}],
+                            },
+                        ],
+                    },
+                ]
+            if todo_mode is not None:
+                list_data["todo_mode"] = todo_mode
+            if schema is not None:
+                list_data["schema"] = schema
+            if copy_from_list_id:
+                list_data["copy_from_list_id"] = copy_from_list_id
+            if include_copied_list_records is not None:
+                list_data["include_copied_list_records"] = include_copied_list_records
 
             response = self.client.api_call(
                 api_method="slackLists.create",

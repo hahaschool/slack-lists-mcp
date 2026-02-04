@@ -126,15 +126,26 @@ class ListItemsRequest(BaseModel):
 class CreateListRequest(BaseModel):
     """Request model for creating a new list."""
 
-    name: str = Field(description="Name of the list")
-    channel_id: str = Field(description="Channel ID where the list will be created")
+    name: str | None = Field(default=None, description="Name of the list")
     description: str | None = Field(
         default=None,
         description="Optional description of the list",
     )
-    is_private: bool = Field(
-        default=False,
-        description="Whether the list should be private",
+    todo_mode: bool | None = Field(
+        default=None,
+        description="When True, creates with Completed, Assignee, Due Date columns",
+    )
+    schema: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="Column definitions for custom list structure",
+    )
+    copy_from_list_id: str | None = Field(
+        default=None,
+        description="ID of an existing list to duplicate",
+    )
+    include_copied_list_records: bool | None = Field(
+        default=None,
+        description="Include records when copying from another list",
     )
 
 
