@@ -37,6 +37,34 @@ Add to your Claude Desktop configuration file:
 }
 ```
 
+### Install from Fork (Latest Features)
+
+For the latest features including builder classes, all 17 tools, and reliability improvements, install from the enhanced fork:
+
+```json
+{
+  "mcpServers": {
+    "slack-lists": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/hahaschool/slack-lists-mcp.git", "slack-lists-mcp"],
+      "env": {
+        "SLACK_BOT_TOKEN": "xoxb-your-bot-token"
+      }
+    }
+  }
+}
+```
+
+Or install manually:
+```bash
+# Clone and install
+git clone https://github.com/hahaschool/slack-lists-mcp.git
+cd slack-lists-mcp
+uv pip install -e .
+
+# Then configure Claude Desktop to use the local installation
+```
+
 ## Configuration
 
 ### Environment Variables
