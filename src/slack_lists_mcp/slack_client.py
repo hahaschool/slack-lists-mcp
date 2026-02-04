@@ -20,6 +20,28 @@ RETRYABLE_ERRORS = frozenset({
     "request_timeout",
 })
 
+# Human-readable error messages for common Slack API errors
+ERROR_MESSAGES = {
+    "invalid_arguments": "Invalid parameters provided. Check field formats and required values.",
+    "list_not_found": "List not found. The list may have been deleted or you don't have access.",
+    "item_not_found": "Item not found in the list. It may have been deleted.",
+    "access_denied": "Access denied. You don't have permission to perform this action.",
+    "rate_limited": "Rate limited. Too many requests - please wait and retry.",
+    "not_authed": "Authentication failed. Check your Slack bot token.",
+    "invalid_auth": "Invalid authentication. The token may be revoked or invalid.",
+    "account_inactive": "The Slack account is inactive or deleted.",
+    "missing_scope": "Missing required OAuth scope. Check bot permissions.",
+    "channel_not_found": "Channel not found or bot doesn't have access.",
+    "user_not_found": "User not found in the workspace.",
+    "cant_update_message": "Cannot update this item. It may be locked or archived.",
+    "is_archived": "Cannot modify archived list or item.",
+    "restricted_action": "This action is restricted by workspace settings.",
+    "team_added_to_org": "This workspace was added to an Enterprise Grid organization.",
+    "ekm_access_denied": "Access denied by Enterprise Key Management.",
+    "invalid_cursor": "Invalid pagination cursor. Start from the beginning.",
+    "fatal_error": "A fatal server error occurred. Please try again later.",
+}
+
 
 class SlackListsClient:
     """Client for interacting with Slack Lists API."""
@@ -49,9 +71,12 @@ class SlackListsClient:
             ErrorResponse model with error details
 
         """
-        error_msg = e.response.get("error", "Unknown error")
+        error_code = e.response.get("error", "Unknown error")
+        # Use human-readable message if available, otherwise use error code
+        error_msg = ERROR_MESSAGES.get(error_code, error_code)
         error_details = {
             "response": e.response,
+            "error_code": error_code,
             "status_code": e.response.status_code
             if hasattr(e.response, "status_code")
             else None,
@@ -59,10 +84,10 @@ class SlackListsClient:
             if hasattr(e.response, "headers")
             else None,
         }
-        logger.error(f"Slack API error: {error_msg} - Details: {error_details}")
+        logger.error(f"Slack API error: {error_code} - {error_msg}")
         return ErrorResponse(
             error=error_msg,
-            error_code=str(e.response.get("error_code", "")),
+            error_code=error_code,
             details=error_details,
         )
 
