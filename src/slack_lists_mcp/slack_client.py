@@ -116,6 +116,7 @@ class SlackListsClient:
         list_id: str,
         initial_fields: list[dict[str, Any]] | None = None,
         duplicated_item_id: str | None = None,
+        parent_item_id: str | None = None,
     ) -> dict[str, Any]:
         """Add a new item to a list.
 
@@ -129,6 +130,8 @@ class SlackListsClient:
                            - One of: rich_text, user, date, select, checkbox, number, email, phone, etc.
             duplicated_item_id: ID of an existing item to duplicate. When provided, creates a
                                copy of the specified item. initial_fields can be omitted.
+            parent_item_id: ID of a parent item to create a subtask under. When provided,
+                           the new item becomes a subtask of the specified parent.
 
         Returns:
             The created item data
@@ -155,6 +158,9 @@ class SlackListsClient:
             # Or duplicate an existing item
             duplicated_item_id = "Rec12345678"
 
+            # Or create a subtask under a parent item
+            parent_item_id = "Rec87654321"
+
         """
         try:
             # Either initial_fields or duplicated_item_id must be provided
@@ -165,6 +171,10 @@ class SlackListsClient:
 
             # Build request payload
             request_data: dict[str, Any] = {"list_id": list_id}
+
+            # Add parent_item_id if creating a subtask
+            if parent_item_id:
+                request_data["parent_item_id"] = parent_item_id
 
             # Handle duplication case
             if duplicated_item_id:
