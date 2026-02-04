@@ -1092,6 +1092,92 @@ async def get_list_export_url(
         }
 
 
+@mcp.tool
+async def wait_for_export(
+    list_id: Annotated[
+        str,
+        Field(description="The ID of the list"),
+    ],
+    job_id: Annotated[
+        str,
+        Field(description="The job ID from start_list_export"),
+    ],
+    timeout: Annotated[
+        int,
+        Field(
+            description="Maximum time to wait in seconds (default: 60)",
+            ge=1,
+            le=300,
+        ),
+    ] = 60,
+    ctx: Context = None,
+) -> dict[str, Any]:
+    """Wait for an export job to complete and return the download URL.
+
+    This tool polls the export status until it's ready or times out.
+    Use this instead of manually polling get_list_export_url.
+
+    Args:
+        list_id: The ID of the list
+        job_id: The job ID from start_list_export
+        timeout: Maximum time to wait in seconds (default: 60, max: 300)
+        ctx: FastMCP context (automatically injected)
+
+    Returns:
+        Export result with download_url if successful
+
+    Example:
+        # Start export
+        start_result = start_list_export(list_id="F123")
+        job_id = start_result["job_id"]
+
+        # Wait for completion (blocks until ready)
+        export = wait_for_export(list_id="F123", job_id=job_id, timeout=120)
+        download_url = export["download_url"]
+
+    """
+    try:
+        if ctx:
+            await ctx.info(f"Waiting for export job {job_id} to complete...")
+
+        result = await slack_client.wait_for_export(
+            list_id=list_id,
+            job_id=job_id,
+            timeout=timeout,
+        )
+
+        if ctx:
+            await ctx.info(f"Export completed: {result.get('download_url')}")
+
+        return {
+            "success": True,
+            "download_url": result.get("download_url"),
+            "job_id": job_id,
+            "list_id": list_id,
+            "status": "completed",
+        }
+
+    except TimeoutError as e:
+        logger.warning(f"Export timeout: {e}")
+        if ctx:
+            await ctx.warning(f"Export timed out: {e!s}")
+        return {
+            "success": False,
+            "error": str(e),
+            "status": "timeout",
+            "job_id": job_id,
+            "list_id": list_id,
+        }
+    except Exception as e:
+        logger.error(f"Error waiting for export: {e}")
+        if ctx:
+            await ctx.error(f"Failed to wait for export: {e!s}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
 # Add a resource to show server information
 @mcp.resource("resource://server/info")
 def get_server_info() -> dict[str, Any]:
@@ -1119,6 +1205,7 @@ def get_server_info() -> dict[str, Any]:
             "delete_list_access",
             "start_list_export",
             "get_list_export_url",
+            "wait_for_export",
         ],
     }
 

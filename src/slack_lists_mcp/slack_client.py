@@ -1226,6 +1226,62 @@ class SlackListsClient:
             logger.error(f"Unexpected error getting export URL: {e}")
             raise
 
+    async def wait_for_export(
+        self,
+        list_id: str,
+        job_id: str,
+        timeout: int = 60,
+        poll_interval: float = 2.0,
+    ) -> dict[str, Any]:
+        """Wait for an export job to complete and return the download URL.
+
+        This method polls the export status until it's ready or times out.
+
+        Args:
+            list_id: The ID of the list
+            job_id: The job ID from start_export
+            timeout: Maximum time to wait in seconds (default: 60)
+            poll_interval: Time between status checks in seconds (default: 2.0)
+
+        Returns:
+            Export result with download_url if successful
+
+        Raises:
+            TimeoutError: If the export doesn't complete within the timeout
+            Exception: If the export fails
+
+        Example:
+            # Start export and wait for completion
+            start_result = await client.start_export(list_id="F123")
+            export = await client.wait_for_export(
+                list_id="F123",
+                job_id=start_result["job_id"],
+                timeout=120  # Wait up to 2 minutes
+            )
+            print(export["download_url"])
+
+        """
+        import time
+
+        start_time = time.time()
+
+        while True:
+            result = await self.get_export_url(list_id=list_id, job_id=job_id)
+
+            if result.get("status") == "completed" and result.get("download_url"):
+                return result
+
+            # Check timeout
+            elapsed = time.time() - start_time
+            if elapsed >= timeout:
+                raise TimeoutError(
+                    f"Export job {job_id} did not complete within {timeout} seconds. "
+                    f"Last status: {result.get('status')}"
+                )
+
+            # Wait before next poll
+            await asyncio.sleep(poll_interval)
+
     async def update_list(
         self,
         list_id: str,
