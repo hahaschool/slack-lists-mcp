@@ -114,7 +114,8 @@ class SlackListsClient:
     async def add_item(
         self,
         list_id: str,
-        initial_fields: list[dict[str, Any]],
+        initial_fields: list[dict[str, Any]] | None = None,
+        duplicated_item_id: str | None = None,
     ) -> dict[str, Any]:
         """Add a new item to a list.
 
@@ -126,11 +127,14 @@ class SlackListsClient:
                            Each field should have:
                            - column_id: The column ID
                            - One of: rich_text, user, date, select, checkbox, number, email, phone, etc.
+            duplicated_item_id: ID of an existing item to duplicate. When provided, creates a
+                               copy of the specified item. initial_fields can be omitted.
 
         Returns:
             The created item data
 
         Example:
+            # Create new item with fields
             initial_fields = [
                 {
                     "column_id": "Col123",
@@ -145,63 +149,67 @@ class SlackListsClient:
                 {
                     "column_id": "Col456",
                     "user": ["U123456"]  # user fields expect an array
-                },
-                {
-                    "column_id": "Col789",
-                    "select": ["OptABC123"]  # select fields also expect an array
-                },
-                {
-                    "column_id": "Col012",
-                    "checkbox": False  # checkbox is a boolean
                 }
             ]
 
+            # Or duplicate an existing item
+            duplicated_item_id = "Rec12345678"
+
         """
         try:
-            if not initial_fields:
-                raise ValueError("At least one field must be provided")
+            # Either initial_fields or duplicated_item_id must be provided
+            if not initial_fields and not duplicated_item_id:
+                raise ValueError(
+                    "Either initial_fields or duplicated_item_id must be provided",
+                )
 
-            # Validate required fields
-            for field in initial_fields:
-                if "column_id" not in field:
-                    raise ValueError("Each field must have a 'column_id'")
-                # All supported field types per Slack API documentation
-                supported_field_types = [
-                    "text",  # Converted to rich_text by _normalize_fields
-                    "rich_text",  # Rich text blocks
-                    "user",  # Array of user IDs
-                    "select",  # Array of option IDs
-                    "checkbox",  # Boolean
-                    "date",  # Array of date strings (YYYY-MM-DD)
-                    "number",  # Array of numbers
-                    "email",  # Array of email addresses
-                    "phone",  # Array of phone numbers
-                    "attachment",  # Array of file IDs
-                    "link",  # Array of link objects
-                    "message",  # Array of Slack message permalinks
-                    "rating",  # Array of numeric ratings
-                    "timestamp",  # Array of Unix timestamps
-                    "channel",  # Array of channel IDs
-                    "reference",  # Array of file references
-                ]
-                if not any(key in field for key in supported_field_types):
-                    raise ValueError(
-                        f"Field with column_id '{field.get('column_id')}' must have a value. "
-                        f"Supported types: {', '.join(supported_field_types)}",
-                    )
+            # Build request payload
+            request_data: dict[str, Any] = {"list_id": list_id}
 
-            # Normalize field formats for better usability
-            normalized_fields = self._normalize_fields(initial_fields)
+            # Handle duplication case
+            if duplicated_item_id:
+                request_data["duplicated_item_id"] = duplicated_item_id
+                logger.debug(f"Duplicating item {duplicated_item_id} in list {list_id}")
+            else:
+                # Validate and normalize fields only when not duplicating
+                for field in initial_fields or []:
+                    if "column_id" not in field:
+                        raise ValueError("Each field must have a 'column_id'")
+                    # All supported field types per Slack API documentation
+                    supported_field_types = [
+                        "text",  # Converted to rich_text by _normalize_fields
+                        "rich_text",  # Rich text blocks
+                        "user",  # Array of user IDs
+                        "select",  # Array of option IDs
+                        "checkbox",  # Boolean
+                        "date",  # Array of date strings (YYYY-MM-DD)
+                        "number",  # Array of numbers
+                        "email",  # Array of email addresses
+                        "phone",  # Array of phone numbers
+                        "attachment",  # Array of file IDs
+                        "link",  # Array of link objects
+                        "message",  # Array of Slack message permalinks
+                        "rating",  # Array of numeric ratings
+                        "timestamp",  # Array of Unix timestamps
+                        "channel",  # Array of channel IDs
+                        "reference",  # Array of file references
+                    ]
+                    if not any(key in field for key in supported_field_types):
+                        raise ValueError(
+                            f"Field with column_id '{field.get('column_id')}' must have a value. "
+                            f"Supported types: {', '.join(supported_field_types)}",
+                        )
 
-            logger.debug(
-                f"Creating item with {len(normalized_fields)} fields in list {list_id}",
-            )
+                # Normalize field formats for better usability
+                normalized_fields = self._normalize_fields(initial_fields or [])
+                request_data["initial_fields"] = normalized_fields
+                logger.debug(
+                    f"Creating item with {len(normalized_fields)} fields in list {list_id}",
+                )
+
             response = self.client.api_call(
                 api_method="slackLists.items.create",
-                json={
-                    "list_id": list_id,
-                    "initial_fields": normalized_fields,
-                },
+                json=request_data,
             )
 
             if response.get("ok"):

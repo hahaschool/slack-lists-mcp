@@ -32,7 +32,7 @@ slack_client = SlackListsClient()
 @mcp.tool
 async def add_list_item(
     initial_fields: Annotated[
-        list[dict[str, Any]],
+        list[dict[str, Any]] | None,
         Field(
             description=(
                 "List of field dictionaries. Each field MUST have "
@@ -44,11 +44,20 @@ async def add_list_item(
                 "'checkbox' (boolean), 'number' (list of numbers), etc. "
                 "Use get_list_structure to find correct column IDs. "
                 "Example: [{'column_id': 'Col123', 'text': 'Task name'}, "
-                "{'column_id': 'Col456', 'user': ['U123456']}]"
+                "{'column_id': 'Col456', 'user': ['U123456']}]. "
+                "Can be omitted when using duplicated_item_id."
             ),
-            min_length=1,
         ),
-    ],
+    ] = None,
+    duplicated_item_id: Annotated[
+        str | None,
+        Field(
+            description=(
+                "ID of an existing item to duplicate. When provided, creates a "
+                "copy of the specified item. initial_fields can be omitted."
+            ),
+        ),
+    ] = None,
     list_id: str | None = None,
     ctx: Context = None,
 ) -> dict[str, Any]:
@@ -60,6 +69,8 @@ async def add_list_item(
         initial_fields: List of field dictionaries. Each field needs:
                        - column_id: The column ID (get from get_list_structure)
                        - Value in appropriate format (text, rich_text, user, date, select, checkbox, etc.)
+                       Can be omitted when using duplicated_item_id.
+        duplicated_item_id: ID of an existing item to duplicate. Creates a copy of the item.
         list_id: The ID of the list (optional, uses DEFAULT_LIST_ID env var if not provided)
                  When DEFAULT_LIST_ID is set, you can omit this parameter entirely
         ctx: FastMCP context (automatically injected)
@@ -68,14 +79,14 @@ async def add_list_item(
         The created item or error information
 
     Example:
-        # First get the list structure
-        structure = await get_list_structure()
-
-        # Then use the correct column IDs
+        # Create new item with fields
         initial_fields = [
             {"column_id": "Col08N4PWM7PZ", "text": "Task name"},
             {"column_id": "Col08NWP011DF", "user": ["U123456"]}
         ]
+
+        # Or duplicate an existing item
+        duplicated_item_id = "Rec12345678"
 
     """
     try:
@@ -88,14 +99,25 @@ async def add_list_item(
                     "error": "list_id is required. Either provide it as parameter or set DEFAULT_LIST_ID environment variable.",
                 }
 
+        # Validate that either initial_fields or duplicated_item_id is provided
+        if not initial_fields and not duplicated_item_id:
+            return {
+                "success": False,
+                "error": "Either initial_fields or duplicated_item_id must be provided",
+            }
+
         if ctx:
-            await ctx.info(
-                f"Adding item to list {list_id} with {len(initial_fields)} fields",
-            )
+            if duplicated_item_id:
+                await ctx.info(f"Duplicating item {duplicated_item_id} in list {list_id}")
+            else:
+                await ctx.info(
+                    f"Adding item to list {list_id} with {len(initial_fields or [])} fields",
+                )
 
         result = await slack_client.add_item(
             list_id=list_id,
             initial_fields=initial_fields,
+            duplicated_item_id=duplicated_item_id,
         )
 
         if ctx:
