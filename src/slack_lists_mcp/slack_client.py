@@ -61,9 +61,8 @@ class SlackListsClient:
         """Normalize field formats for better API usability.
 
         Handles common format issues:
-        - Wraps select field values in arrays if not already
-        - Wraps user field values in arrays if not already
-        - Ensures rich_text fields have proper structure
+        - Wraps all array field values in arrays if not already (select, user, date, number, etc.)
+        - Converts text to rich_text format
 
         Args:
             fields: List of field dictionaries to normalize
@@ -72,24 +71,34 @@ class SlackListsClient:
             Normalized field list
 
         """
+        # All field types that expect array values per Slack API documentation
+        array_field_types = [
+            "select",
+            "user",
+            "date",
+            "number",
+            "email",
+            "phone",
+            "attachment",
+            "message",
+            "rating",
+            "timestamp",
+            "channel",
+            "reference",
+        ]
+
         normalized = []
         for field in fields:
             # Create a copy to avoid mutating the original
             normalized_field = field.copy()
 
-            # Handle select fields - wrap single values in array
-            if "select" in normalized_field and not isinstance(
-                normalized_field["select"],
-                list,
-            ):
-                normalized_field["select"] = [normalized_field["select"]]
-
-            # Handle user fields - wrap single values in array
-            if "user" in normalized_field and not isinstance(
-                normalized_field["user"],
-                list,
-            ):
-                normalized_field["user"] = [normalized_field["user"]]
+            # Handle all array field types - wrap single values in array
+            for field_type in array_field_types:
+                if field_type in normalized_field and not isinstance(
+                    normalized_field[field_type],
+                    list,
+                ):
+                    normalized_field[field_type] = [normalized_field[field_type]]
 
             # Handle text fields by converting to rich_text if needed
             if "text" in normalized_field and "rich_text" not in normalized_field:
