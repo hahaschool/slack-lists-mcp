@@ -1,6 +1,13 @@
 """Slack Lists MCP Server Package."""
 
 from slack_lists_mcp.__main__ import main
+from slack_lists_mcp.builders import (
+    ColumnBuilder,
+    ItemBuilder,
+    SchemaBuilder,
+    SelectOption,
+    batch_create_items,
+)
 from slack_lists_mcp.helpers import (
     AccessLevel,
     FieldType,
@@ -32,6 +39,12 @@ __all__ = [
     # Enums
     "FieldType",
     "AccessLevel",
+    # Builders
+    "SchemaBuilder",
+    "ColumnBuilder",
+    "SelectOption",
+    "ItemBuilder",
+    "batch_create_items",
     # Helper functions
     "make_rich_text",
     "make_link",
