@@ -247,6 +247,70 @@ async def delete_list_item(
 
 
 @mcp.tool
+async def delete_list_items(
+    item_ids: Annotated[
+        list[str],
+        Field(
+            description="List of item IDs to delete",
+            min_length=1,
+        ),
+    ],
+    list_id: str | None = None,
+    ctx: Context = None,
+) -> dict[str, Any]:
+    """Delete multiple items from a Slack list.
+
+    More efficient than calling delete_list_item multiple times.
+
+    Args:
+        item_ids: List of item IDs to delete
+        list_id: The ID of the list containing the items (optional, uses DEFAULT_LIST_ID env var if not provided)
+        ctx: FastMCP context (automatically injected)
+
+    Returns:
+        Deletion confirmation with count or error information
+
+    """
+    try:
+        # Use default list ID from environment if not provided
+        if list_id is None:
+            list_id = settings.default_list_id
+            if list_id is None:
+                return {
+                    "success": False,
+                    "error": "list_id is required. Either provide it as parameter or set DEFAULT_LIST_ID environment variable.",
+                }
+
+        if ctx:
+            await ctx.info(f"Deleting {len(item_ids)} items from list {list_id}")
+
+        result = await slack_client.delete_items(
+            list_id=list_id,
+            item_ids=item_ids,
+        )
+
+        if ctx:
+            await ctx.info(f"Successfully deleted {len(item_ids)} items")
+
+        return {
+            "success": True,
+            "deleted": True,
+            "count": len(item_ids),
+            "item_ids": item_ids,
+            "list_id": list_id,
+        }
+
+    except Exception as e:
+        logger.error(f"Error deleting list items: {e}")
+        if ctx:
+            await ctx.error(f"Failed to delete items: {e!s}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+@mcp.tool
 async def get_list_item(
     item_id: str,
     list_id: str | None = None,
@@ -616,6 +680,7 @@ def get_server_info() -> dict[str, Any]:
             "add_list_item",
             "update_list_item",
             "delete_list_item",
+            "delete_list_items",
             "get_list_item",
             "list_items",
             "get_list_info",

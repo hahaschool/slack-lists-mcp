@@ -332,6 +332,47 @@ class SlackListsClient:
             logger.error(f"Unexpected error deleting item: {e}")
             raise
 
+    async def delete_items(
+        self,
+        list_id: str,
+        item_ids: list[str],
+    ) -> dict[str, Any]:
+        """Delete multiple items from a list.
+
+        Args:
+            list_id: The ID of the list
+            item_ids: List of item IDs to delete
+
+        Returns:
+            Confirmation of deletion with count
+
+        """
+        try:
+            if not item_ids:
+                raise ValueError("At least one item ID must be provided")
+
+            response = self.client.api_call(
+                api_method="slackLists.items.deleteMultiple",
+                json={
+                    "list_id": list_id,
+                    "ids": item_ids,
+                },
+            )
+
+            if response.get("ok"):
+                return {"deleted": True, "count": len(item_ids), "item_ids": item_ids}
+            raise SlackApiError(
+                message="Failed to delete items",
+                response=response,
+            )
+
+        except SlackApiError as e:
+            error_response = self._handle_api_error(e)
+            raise Exception(f"Failed to delete items: {error_response.error}")
+        except Exception as e:
+            logger.error(f"Unexpected error deleting items: {e}")
+            raise
+
     async def get_item(
         self,
         list_id: str,
