@@ -643,45 +643,88 @@ async def get_list_structure(
 @mcp.tool
 async def create_list(
     name: Annotated[
-        str,
+        str | None,
         Field(description="Name of the list to create"),
-    ],
-    channel_id: Annotated[
-        str,
-        Field(description="Channel ID where the list will be created"),
-    ],
+    ] = None,
     description: Annotated[
         str | None,
         Field(description="Optional description for the list"),
     ] = None,
-    is_private: Annotated[
-        bool,
-        Field(description="Whether the list should be private (default: False)"),
-    ] = False,
+    todo_mode: Annotated[
+        bool | None,
+        Field(
+            description=(
+                "When True, creates list with Completed, Assignee, and Due Date "
+                "columns for task tracking"
+            ),
+        ),
+    ] = None,
+    schema: Annotated[
+        list[dict[str, Any]] | None,
+        Field(
+            description=(
+                "Column definitions for the list. Each column should have: "
+                "key (string), name (string), type (text/number/select/date/user/checkbox/etc.), "
+                "is_primary_column (optional bool), options (optional dict for select choices, etc.). "
+                "Example: [{'key': 'task', 'name': 'Task', 'type': 'text', 'is_primary_column': True}]"
+            ),
+        ),
+    ] = None,
+    copy_from_list_id: Annotated[
+        str | None,
+        Field(description="ID of an existing list to duplicate"),
+    ] = None,
+    include_copied_list_records: Annotated[
+        bool | None,
+        Field(description="When True and copying, includes records from the source list"),
+    ] = None,
     ctx: Context = None,
 ) -> dict[str, Any]:
     """Create a new Slack list.
 
     Args:
         name: Name of the list to create
-        channel_id: Channel ID where the list will be created
         description: Optional description for the list
-        is_private: Whether the list should be private
+        todo_mode: When True, creates with Completed, Assignee, Due Date columns
+        schema: Column definitions for custom list structure
+        copy_from_list_id: ID of list to duplicate
+        include_copied_list_records: Include records when copying
         ctx: FastMCP context (automatically injected)
 
     Returns:
         The created list data or error information
 
+    Example:
+        # Simple todo list
+        create_list(name="My Tasks", todo_mode=True)
+
+        # Custom schema
+        create_list(
+            name="Projects",
+            schema=[
+                {"key": "name", "name": "Name", "type": "text", "is_primary_column": True},
+                {"key": "status", "name": "Status", "type": "select"}
+            ]
+        )
+
+        # Duplicate existing list
+        create_list(copy_from_list_id="F1234567890", include_copied_list_records=True)
+
     """
     try:
         if ctx:
-            await ctx.info(f"Creating list '{name}' in channel {channel_id}")
+            if copy_from_list_id:
+                await ctx.info(f"Duplicating list {copy_from_list_id}")
+            else:
+                await ctx.info(f"Creating list '{name or 'Unnamed'}'")
 
         result = await slack_client.create_list(
             name=name,
-            channel_id=channel_id,
             description=description,
-            is_private=is_private,
+            todo_mode=todo_mode,
+            schema=schema,
+            copy_from_list_id=copy_from_list_id,
+            include_copied_list_records=include_copied_list_records,
         )
 
         if ctx:
