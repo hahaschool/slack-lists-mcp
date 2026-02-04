@@ -4,16 +4,18 @@ An MCP (Model Context Protocol) server for managing Slack Lists. This server pro
 
 ## Features
 
-- ✨ Full CRUD operations for Slack List items
+- ✨ Full CRUD operations for Slack Lists and items
 - 🔍 Advanced filtering with multiple operators
-- 📑 Pagination support for large lists
+- 📑 Pagination support with async iteration
 - 🏗️ Dynamic column structure discovery
-- 🎯 Type-safe operations with validation
+- 🎯 Type-safe operations with `FieldType` and `AccessLevel` enums
 - 🚀 Async/await support for better performance
 - 🔐 Access control management (read/write/owner permissions)
-- 📤 List export functionality (async job-based)
+- 📤 List export functionality with polling helper
 - 🔄 Automatic retry with exponential backoff
 - 📝 Item duplication and subtask creation
+- 🛠️ Fluent builders for schema and item creation
+- 🔧 Helper functions for all 17+ field types
 
 ## Installation
 
@@ -57,6 +59,8 @@ Add to your Claude Desktop configuration file:
 3. Install the app to your workspace
 4. Copy the Bot User OAuth Token (starts with `xoxb-`)
 
+**Note:** Slack Lists are only available to workspaces on a **paid plan**.
+
 ### Using Default List ID
 
 You can set a default list ID using the `DEFAULT_LIST_ID` environment variable. This allows you to omit the `list_id` parameter from tool calls when working with a specific list.
@@ -77,139 +81,127 @@ You can set a default list ID using the `DEFAULT_LIST_ID` environment variable. 
 }
 ```
 
-With this configuration, you can call tools without specifying `list_id`:
-- `add_list_item` with just `initial_fields`
-- `list_items` with just `limit` and `filters`
-- `get_list_structure` with no parameters
+## Available Tools (17 total)
 
-## Available Tools
+### List Management
 
-### 1. `get_list_structure`
+| Tool | Description |
+|------|-------------|
+| `create_list` | Create a new Slack List |
+| `update_list` | Update list properties |
+| `delete_list` | Delete an entire list (permanent!) |
+| `get_list_info` | Get list metadata |
+| `get_list_structure` | Get column schema |
+
+### Item Operations
+
+| Tool | Description |
+|------|-------------|
+| `add_list_item` | Add a new item |
+| `update_list_item` | Update item fields |
+| `delete_list_item` | Delete a single item |
+| `delete_list_items` | Delete multiple items |
+| `get_list_item` | Get a specific item |
+| `list_items` | List items with filtering |
+
+### Access Control
+
+| Tool | Description |
+|------|-------------|
+| `set_list_access` | Grant read/write/owner access |
+| `delete_list_access` | Revoke access |
+
+### Export
+
+| Tool | Description |
+|------|-------------|
+| `start_list_export` | Start async export job |
+| `get_list_export_url` | Get export download URL |
+| `wait_for_export` | Wait for export completion |
+
+---
+
+### Tool Details
+
+#### `get_list_structure`
 Get the column structure of a Slack List.
 
-**Parameters:**
-- `list_id` (optional): The ID of the list (uses DEFAULT_LIST_ID env var if not provided)
+```json
+{
+  "list_id": "F1234567890"
+}
+```
 
-**Returns:** Column definitions including IDs, names, types, and options
-
-### 2. `add_list_item`
+#### `add_list_item`
 Add a new item to a Slack List.
 
-**Parameters:**
-- `initial_fields` (optional): Array of field objects with column_id and value (required unless using `duplicated_item_id`)
-- `duplicated_item_id` (optional): ID of an existing item to duplicate
-- `parent_item_id` (optional): ID of a parent item to create a subtask under
-- `list_id` (optional): The ID of the list (uses DEFAULT_LIST_ID env var if not provided)
-
-**Example (Simplified format):**
 ```json
 {
   "list_id": "F1234567890",
   "initial_fields": [
-    {
-      "column_id": "Col123",
-      "text": "Task Name"  // Simple text format
-    },
-    {
-      "column_id": "Col456",
-      "select": "OptABC123"  // Single select value
-    },
-    {
-      "column_id": "Col789",
-      "user": "U1234567"  // Single user ID
-    },
-    {
-      "column_id": "Col012",
-      "checkbox": false
-    }
+    {"column_id": "Col123", "text": "Task Name"},
+    {"column_id": "Col456", "select": "OptABC123"},
+    {"column_id": "Col789", "user": "U1234567"},
+    {"column_id": "Col012", "checkbox": false}
   ]
 }
 ```
 
-**Example (Full rich_text format - also supported):**
+**Item Duplication:**
 ```json
 {
   "list_id": "F1234567890",
-  "initial_fields": [
-    {
-      "column_id": "Col123",
-      "rich_text": [{
-        "type": "rich_text",
-        "elements": [{
-          "type": "rich_text_section",
-          "elements": [{"type": "text", "text": "Task Name"}]
-        }]
-      }]
-    },
-    {
-      "column_id": "Col456",
-      "select": ["OptABC123"]  // Array format
-    }
-  ]
+  "duplicated_item_id": "Rec12345678"
 }
 ```
 
-### 3. `update_list_item`
+**Create Subtask:**
+```json
+{
+  "list_id": "F1234567890",
+  "parent_item_id": "Rec12345678",
+  "initial_fields": [{"column_id": "Col123", "text": "Subtask"}]
+}
+```
+
+#### `update_list_item`
 Update existing items in a Slack List.
 
-**Parameters:**
-- `cells` (required): Array of cell objects with row_id, column_id, and value
-- `list_id` (optional): The ID of the list (uses DEFAULT_LIST_ID env var if not provided)
-
-**Field Formats:** (Same as add_list_item)
-- **Text fields**: Can use simple `text` key (auto-converted to rich_text)
-- **Select fields**: Can use single value (auto-wrapped in array)
-- **User fields**: Can use single user ID (auto-wrapped in array)
-- **Checkbox fields**: Boolean value
-
-**Example (Simplified format):**
 ```json
 {
   "list_id": "F1234567890",
   "cells": [
-    {
-      "row_id": "Rec123",
-      "column_id": "Col123",
-      "text": "Updated Task Name"  // Simple text format
-    },
-    {
-      "row_id": "Rec123",
-      "column_id": "Col456",
-      "checkbox": true
-    },
-    {
-      "row_id": "Rec123",
-      "column_id": "Col789",
-      "select": "OptXYZ456"  // Single select value
-    }
+    {"row_id": "Rec123", "column_id": "Col123", "text": "Updated Name"},
+    {"row_id": "Rec123", "column_id": "Col456", "checkbox": true}
   ]
 }
 ```
 
-### 4. `delete_list_item`
-Delete an item from a Slack List.
+**Create via update (batch creation):**
+```json
+{
+  "list_id": "F1234567890",
+  "cells": [
+    {"row_id_to_create": true, "column_id": "Col123", "text": "New Item 1"},
+    {"row_id_to_create": true, "column_id": "Col123", "text": "New Item 2"}
+  ]
+}
+```
 
-**Parameters:**
-- `item_id` (required): The ID of the item to delete
-- `list_id` (optional): The ID of the list (uses DEFAULT_LIST_ID env var if not provided)
+#### `list_items`
+List items with optional filtering.
 
-### 5. `get_list_item`
-Get a specific item from a Slack List.
-
-**Parameters:**
-- `item_id` (required): The ID of the item
-- `list_id` (optional): The ID of the list (uses DEFAULT_LIST_ID env var if not provided)
-- `include_is_subscribed` (optional): Include subscription status
-
-### 6. `list_items`
-List all items in a Slack List with optional filtering.
-
-**Parameters:**
-- `list_id` (optional): The ID of the list (uses DEFAULT_LIST_ID env var if not provided)
-- `limit` (optional): Maximum number of items (default: 100)
-- `cursor` (optional): Pagination cursor
-- `archived` (optional): Filter for archived items
-- `filters` (optional): Column-based filters
+```json
+{
+  "list_id": "F1234567890",
+  "limit": 50,
+  "filters": {
+    "name": {"contains": "Task"},
+    "todo_completed": {"equals": false},
+    "todo_assignee": {"in": ["U123", "U456"]}
+  }
+}
+```
 
 **Filter Operators:**
 - `equals`: Exact match
@@ -219,56 +211,10 @@ List all items in a Slack List with optional filtering.
 - `in`: Value is in the provided list
 - `not_in`: Value is not in the provided list
 
-**Example with filters:**
-```json
-{
-  "list_id": "F1234567890",
-  "filters": {
-    "name": {"contains": "Task"},
-    "todo_completed": {"equals": false},
-    "todo_assignee": {"in": ["U123", "U456"]}
-  }
-}
-```
-
-### 7. `get_list_info`
-Get metadata about a Slack List.
-
-**Parameters:**
-
-- `list_id` (optional): The ID of the list (uses DEFAULT_LIST_ID env var if not provided)
-
-### 8. `delete_list_items`
-
-Delete multiple items from a Slack List in a single call.
-
-**Parameters:**
-
-- `item_ids` (required): Array of item IDs to delete
-- `list_id` (optional): The ID of the list (uses DEFAULT_LIST_ID env var if not provided)
-
-**Example:**
-```json
-{
-  "list_id": "F1234567890",
-  "item_ids": ["Rec123", "Rec456", "Rec789"]
-}
-```
-
-### 9. `create_list`
-
+#### `create_list`
 Create a new Slack List.
 
-**Parameters:**
-
-- `name` (optional): Name of the list
-- `description` (optional): Description of the list
-- `todo_mode` (optional): When true, creates with Completed, Assignee, Due Date columns
-- `schema` (optional): Custom column definitions for the list structure
-- `copy_from_list_id` (optional): ID of an existing list to duplicate
-- `include_copied_list_records` (optional): Include records when copying from another list
-
-**Example (Simple todo list):**
+**Simple todo list:**
 ```json
 {
   "name": "My Tasks",
@@ -276,42 +222,37 @@ Create a new Slack List.
 }
 ```
 
-**Example (Custom schema):**
+**Custom schema:**
 ```json
 {
   "name": "Project Tracker",
   "schema": [
     {"key": "task", "name": "Task", "type": "text", "is_primary_column": true},
-    {"key": "status", "name": "Status", "type": "select"},
+    {"key": "status", "name": "Status", "type": "select", "options": {
+      "choices": [
+        {"key": "todo", "value": "To Do", "color": "gray"},
+        {"key": "in_progress", "value": "In Progress", "color": "blue"},
+        {"key": "done", "value": "Done", "color": "green"}
+      ]
+    }},
     {"key": "assignee", "name": "Assignee", "type": "user"},
     {"key": "due", "name": "Due Date", "type": "date"}
   ]
 }
 ```
 
-### 10. `update_list`
+#### `delete_list`
+Delete an entire Slack List (permanent!).
 
-Update a Slack List's properties.
+```json
+{
+  "list_id": "F1234567890"
+}
+```
 
-**Parameters:**
+#### `set_list_access`
+Set access level for users or channels.
 
-- `list_id` (required): The ID of the list to update
-- `name` (optional): New name for the list
-- `description` (optional): New description for the list
-- `todo_mode` (optional): Enable/disable todo mode
-
-### 11. `set_list_access`
-
-Set access level for users or channels on a Slack List.
-
-**Parameters:**
-
-- `list_id` (required): The ID of the list
-- `access_level` (required): Permission level - `read`, `write`, or `owner`
-- `user_ids` (optional): Array of user IDs to grant access (mutually exclusive with channel_ids)
-- `channel_ids` (optional): Array of channel IDs to grant access (mutually exclusive with user_ids)
-
-**Example:**
 ```json
 {
   "list_id": "F1234567890",
@@ -320,49 +261,128 @@ Set access level for users or channels on a Slack List.
 }
 ```
 
-### 12. `delete_list_access`
+#### `wait_for_export`
+Wait for export completion with automatic polling.
 
-Revoke access for users or channels from a Slack List.
+```json
+{
+  "list_id": "F1234567890",
+  "job_id": "LeF123456...",
+  "timeout": 120
+}
+```
 
-**Parameters:**
+## Supported Field Types
 
-- `list_id` (required): The ID of the list
-- `user_ids` (optional): Array of user IDs to revoke access (mutually exclusive with channel_ids)
-- `channel_ids` (optional): Array of channel IDs to revoke access (mutually exclusive with user_ids)
+| Type | Description | Example |
+|------|-------------|---------|
+| `text` | Rich text (auto-converted) | `"Hello World"` |
+| `select` | Single/multi select | `"OptABC123"` or `["Opt1", "Opt2"]` |
+| `user` | User references | `"U123456"` or `["U123", "U456"]` |
+| `date` | Date values | `"2024-12-31"` |
+| `number` | Numeric values | `42` or `3.14` |
+| `checkbox` | Boolean | `true` or `false` |
+| `email` | Email addresses | `"user@example.com"` |
+| `phone` | Phone numbers | `"+1-555-1234"` |
+| `link` | URLs | `"https://example.com"` |
+| `attachment` | File IDs | `"F1234567890"` |
+| `channel` | Channel references | `"C1234567890"` |
+| `message` | Message permalinks | `"https://team.slack.com/archives/..."` |
+| `rating` | Rating values | `4` |
+| `timestamp` | Unix timestamps | `1704067200` |
+| `vote` | Vote values | `5` |
+| `canvas` | Canvas IDs | `"F1234567890"` |
 
-### 13. `start_list_export`
+## Python SDK Usage
 
-Start an async export job for a Slack List.
+When using the client directly in Python:
 
-**Parameters:**
-
-- `list_id` (required): The ID of the list to export
-- `include_archived` (optional): Include archived items in the export (default: false)
-
-**Returns:** Job ID for polling with `get_list_export_url`
-
-### 14. `get_list_export_url`
-
-Get the download URL for a completed list export job.
-
-**Parameters:**
-
-- `list_id` (required): The ID of the list
-- `job_id` (required): The job ID from `start_list_export`
-
-**Returns:** Download URL if ready, or processing status
-
-**Example workflow:**
+### Helper Functions
 
 ```python
-# 1. Start export
-result = start_list_export(list_id="F123")
-job_id = result["job_id"]
+from slack_lists_mcp import (
+    make_field,
+    make_rich_text,
+    make_select,
+    make_user,
+    extract_text,
+    FieldType,
+    AccessLevel,
+)
 
-# 2. Poll for completion (wait a few seconds)
-export = get_list_export_url(list_id="F123", job_id=job_id)
-if export["status"] == "completed":
-    download_url = export["download_url"]
+# Create fields easily
+fields = [
+    make_field("Col1", "Task Name", "text"),
+    make_field("Col2", "U123456", "user"),
+    make_field("Col3", True, "checkbox"),
+    make_field("Col4", 4, FieldType.RATING),
+]
+
+# Extract text from rich_text responses
+for field in item["fields"]:
+    if "rich_text" in field:
+        text = extract_text(field["rich_text"])
+        print(text)
+```
+
+### Builder Classes
+
+```python
+from slack_lists_mcp import (
+    SchemaBuilder,
+    SelectOption,
+    ItemBuilder,
+    batch_create_items,
+)
+
+# Build a schema fluently
+schema = (
+    SchemaBuilder()
+    .add_text("task", "Task Name", primary=True)
+    .add_select("status", "Status", [
+        SelectOption("todo", "To Do", "gray"),
+        SelectOption("in_progress", "In Progress", "blue"),
+        SelectOption("done", "Done", "green"),
+    ])
+    .add_user("assignee", "Assignee")
+    .add_date("due_date", "Due Date")
+    .build()
+)
+
+# Build items fluently
+fields = (
+    ItemBuilder()
+    .text("Col1", "My Task")
+    .user("Col2", "U123456")
+    .checkbox("Col3", True)
+    .date("Col4", "2024-12-31")
+    .build()
+)
+
+# Batch create items
+cells = batch_create_items([
+    ItemBuilder().text("Col1", "Task 1"),
+    ItemBuilder().text("Col1", "Task 2"),
+])
+```
+
+### Async Iteration
+
+```python
+from slack_lists_mcp.slack_client import SlackListsClient
+
+client = SlackListsClient()
+
+# Iterate through all items automatically
+async for item in client.iter_all_items("F123"):
+    print(item["id"])
+
+# With filters
+async for item in client.iter_all_items(
+    "F123",
+    filters={"status": {"equals": "active"}}
+):
+    process_item(item)
 ```
 
 ## Development
@@ -417,6 +437,6 @@ MIT License - see LICENSE file for details
 
 ## Support
 
-- [GitHub Issues](https://github.com/yourusername/slack-lists-mcp/issues)
-- [Slack API Documentation](https://api.slack.com/methods#lists)
+- [GitHub Issues](https://github.com/ppspps824/slack-lists-mcp/issues)
+- [Slack Lists API Documentation](https://docs.slack.dev/surfaces/lists/)
 - [MCP Documentation](https://modelcontextprotocol.io)
