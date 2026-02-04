@@ -10,6 +10,10 @@ An MCP (Model Context Protocol) server for managing Slack Lists. This server pro
 - 🏗️ Dynamic column structure discovery
 - 🎯 Type-safe operations with validation
 - 🚀 Async/await support for better performance
+- 🔐 Access control management (read/write/owner permissions)
+- 📤 List export functionality (async job-based)
+- 🔄 Automatic retry with exponential backoff
+- 📝 Item duplication and subtask creation
 
 ## Installation
 
@@ -92,7 +96,9 @@ Get the column structure of a Slack List.
 Add a new item to a Slack List.
 
 **Parameters:**
-- `initial_fields` (required): Array of field objects with column_id and value
+- `initial_fields` (optional): Array of field objects with column_id and value (required unless using `duplicated_item_id`)
+- `duplicated_item_id` (optional): ID of an existing item to duplicate
+- `parent_item_id` (optional): ID of a parent item to create a subtask under
 - `list_id` (optional): The ID of the list (uses DEFAULT_LIST_ID env var if not provided)
 
 **Example (Simplified format):**
@@ -229,7 +235,135 @@ List all items in a Slack List with optional filtering.
 Get metadata about a Slack List.
 
 **Parameters:**
+
 - `list_id` (optional): The ID of the list (uses DEFAULT_LIST_ID env var if not provided)
+
+### 8. `delete_list_items`
+
+Delete multiple items from a Slack List in a single call.
+
+**Parameters:**
+
+- `item_ids` (required): Array of item IDs to delete
+- `list_id` (optional): The ID of the list (uses DEFAULT_LIST_ID env var if not provided)
+
+**Example:**
+```json
+{
+  "list_id": "F1234567890",
+  "item_ids": ["Rec123", "Rec456", "Rec789"]
+}
+```
+
+### 9. `create_list`
+
+Create a new Slack List.
+
+**Parameters:**
+
+- `name` (optional): Name of the list
+- `description` (optional): Description of the list
+- `todo_mode` (optional): When true, creates with Completed, Assignee, Due Date columns
+- `schema` (optional): Custom column definitions for the list structure
+- `copy_from_list_id` (optional): ID of an existing list to duplicate
+- `include_copied_list_records` (optional): Include records when copying from another list
+
+**Example (Simple todo list):**
+```json
+{
+  "name": "My Tasks",
+  "todo_mode": true
+}
+```
+
+**Example (Custom schema):**
+```json
+{
+  "name": "Project Tracker",
+  "schema": [
+    {"key": "task", "name": "Task", "type": "text", "is_primary_column": true},
+    {"key": "status", "name": "Status", "type": "select"},
+    {"key": "assignee", "name": "Assignee", "type": "user"},
+    {"key": "due", "name": "Due Date", "type": "date"}
+  ]
+}
+```
+
+### 10. `update_list`
+
+Update a Slack List's properties.
+
+**Parameters:**
+
+- `list_id` (required): The ID of the list to update
+- `name` (optional): New name for the list
+- `description` (optional): New description for the list
+- `todo_mode` (optional): Enable/disable todo mode
+
+### 11. `set_list_access`
+
+Set access level for users or channels on a Slack List.
+
+**Parameters:**
+
+- `list_id` (required): The ID of the list
+- `access_level` (required): Permission level - `read`, `write`, or `owner`
+- `user_ids` (optional): Array of user IDs to grant access (mutually exclusive with channel_ids)
+- `channel_ids` (optional): Array of channel IDs to grant access (mutually exclusive with user_ids)
+
+**Example:**
+```json
+{
+  "list_id": "F1234567890",
+  "access_level": "write",
+  "user_ids": ["U123456", "U789012"]
+}
+```
+
+### 12. `delete_list_access`
+
+Revoke access for users or channels from a Slack List.
+
+**Parameters:**
+
+- `list_id` (required): The ID of the list
+- `user_ids` (optional): Array of user IDs to revoke access (mutually exclusive with channel_ids)
+- `channel_ids` (optional): Array of channel IDs to revoke access (mutually exclusive with user_ids)
+
+### 13. `start_list_export`
+
+Start an async export job for a Slack List.
+
+**Parameters:**
+
+- `list_id` (required): The ID of the list to export
+- `include_archived` (optional): Include archived items in the export (default: false)
+
+**Returns:** Job ID for polling with `get_list_export_url`
+
+### 14. `get_list_export_url`
+
+Get the download URL for a completed list export job.
+
+**Parameters:**
+
+- `list_id` (required): The ID of the list
+- `job_id` (required): The job ID from `start_list_export`
+
+**Returns:** Download URL if ready, or processing status
+
+**Example workflow:**
+
+```python
+# 1. Start export
+result = start_list_export(list_id="F123")
+job_id = result["job_id"]
+
+# 2. Poll for completion (wait a few seconds)
+export = get_list_export_url(list_id="F123", job_id=job_id)
+if export["status"] == "completed":
+    download_url = export["download_url"]
+```
 
 ## Development
 
