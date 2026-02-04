@@ -1,5 +1,6 @@
 """Slack Lists API client implementation."""
 
+import asyncio
 import logging
 from typing import Any
 
@@ -10,6 +11,14 @@ from slack_lists_mcp.config import get_settings
 from slack_lists_mcp.models import ErrorResponse
 
 logger = logging.getLogger(__name__)
+
+# Errors that should trigger a retry
+RETRYABLE_ERRORS = frozenset({
+    "rate_limited",
+    "service_unavailable",
+    "internal_error",
+    "request_timeout",
+})
 
 
 class SlackListsClient:
@@ -56,6 +65,65 @@ class SlackListsClient:
             error_code=str(e.response.get("error_code", "")),
             details=error_details,
         )
+
+    async def _call_with_retry(
+        self,
+        api_method: str,
+        json: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Execute an API call with retry logic for transient errors.
+
+        Args:
+            api_method: The Slack API method to call
+            json: The request payload
+
+        Returns:
+            The API response
+
+        Raises:
+            SlackApiError: If the API call fails after all retries
+
+        """
+        last_exception = None
+        base_delay = 1.0  # Start with 1 second delay
+
+        for attempt in range(self.retry_count + 1):
+            try:
+                response = self.client.api_call(
+                    api_method=api_method,
+                    json=json,
+                )
+                return response
+
+            except SlackApiError as e:
+                error_code = e.response.get("error", "")
+
+                # Check if this is a retryable error
+                if error_code in RETRYABLE_ERRORS and attempt < self.retry_count:
+                    # Calculate delay with exponential backoff
+                    delay = base_delay * (2 ** attempt)
+
+                    # For rate limiting, check if Retry-After header is provided
+                    if error_code == "rate_limited":
+                        retry_after = e.response.headers.get("Retry-After")
+                        if retry_after:
+                            delay = max(delay, float(retry_after))
+
+                    logger.warning(
+                        f"Retryable error '{error_code}' on attempt {attempt + 1}/{self.retry_count + 1}. "
+                        f"Retrying in {delay:.1f}s..."
+                    )
+                    await asyncio.sleep(delay)
+                    last_exception = e
+                    continue
+
+                # Non-retryable error or out of retries
+                raise
+
+        # Should not reach here, but just in case
+        if last_exception:
+            raise last_exception
+        raise RuntimeError("Unexpected retry loop exit")
 
     def _normalize_fields(self, fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Normalize field formats for better API usability.
@@ -226,7 +294,7 @@ class SlackListsClient:
                     f"Creating item with {len(normalized_fields)} fields in list {list_id}",
                 )
 
-            response = self.client.api_call(
+            response = await self._call_with_retry(
                 api_method="slackLists.items.create",
                 json=request_data,
             )
@@ -318,7 +386,7 @@ class SlackListsClient:
             logger.info(
                 f"Updating {len(normalized_cells)} cells in list {list_id}",
             )
-            response = self.client.api_call(
+            response = await self._call_with_retry(
                 api_method="slackLists.items.update",
                 json={
                     "list_id": list_id,
@@ -509,7 +577,7 @@ class SlackListsClient:
             if archived is not None:
                 params["archived"] = archived
 
-            response = self.client.api_call(
+            response = await self._call_with_retry(
                 api_method="slackLists.items.list",
                 json=params,
             )
