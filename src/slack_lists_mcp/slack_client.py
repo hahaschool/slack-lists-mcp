@@ -688,6 +688,71 @@ class SlackListsClient:
             logger.error(f"Unexpected error creating list: {e}")
             raise
 
+    async def update_list(
+        self,
+        list_id: str,
+        name: str | None = None,
+        description: str | None = None,
+        todo_mode: bool | None = None,
+    ) -> dict[str, Any]:
+        """Update a list's properties.
+
+        Args:
+            list_id: The ID of the list to update
+            name: New name for the list
+            description: New description for the list
+            todo_mode: Enable/disable todo mode (adds Completed, Assignee, Due date columns)
+
+        Returns:
+            Success indicator
+
+        """
+        try:
+            update_data: dict[str, Any] = {"id": list_id}
+
+            if name is not None:
+                update_data["name"] = name
+            if description is not None:
+                # Convert plain text to description_blocks format
+                update_data["description_blocks"] = [
+                    {
+                        "type": "rich_text",
+                        "elements": [
+                            {
+                                "type": "rich_text_section",
+                                "elements": [{"type": "text", "text": description}],
+                            },
+                        ],
+                    },
+                ]
+            if todo_mode is not None:
+                update_data["todo_mode"] = todo_mode
+
+            # Check if any update fields provided
+            if len(update_data) == 1:  # Only has 'id'
+                raise ValueError(
+                    "At least one of name, description, or todo_mode must be provided",
+                )
+
+            response = self.client.api_call(
+                api_method="slackLists.update",
+                json=update_data,
+            )
+
+            if response.get("ok"):
+                return {"success": True}
+            raise SlackApiError(
+                message="Failed to update list",
+                response=response,
+            )
+
+        except SlackApiError as e:
+            error_response = self._handle_api_error(e)
+            raise Exception(f"Failed to update list: {error_response.error}")
+        except Exception as e:
+            logger.error(f"Unexpected error updating list: {e}")
+            raise
+
 
 # Create a singleton instance
 slack_client = SlackListsClient()

@@ -600,6 +600,76 @@ async def create_list(
         }
 
 
+@mcp.tool
+async def update_list(
+    list_id: Annotated[
+        str,
+        Field(description="The ID of the list to update"),
+    ],
+    name: Annotated[
+        str | None,
+        Field(description="New name for the list"),
+    ] = None,
+    description: Annotated[
+        str | None,
+        Field(description="New description for the list"),
+    ] = None,
+    todo_mode: Annotated[
+        bool | None,
+        Field(
+            description="Enable/disable todo mode. When enabled, adds Completed, Assignee, and Due date columns.",
+        ),
+    ] = None,
+    ctx: Context = None,
+) -> dict[str, Any]:
+    """Update a Slack list's properties.
+
+    Args:
+        list_id: The ID of the list to update
+        name: New name for the list
+        description: New description for the list
+        todo_mode: Enable/disable todo mode
+        ctx: FastMCP context (automatically injected)
+
+    Returns:
+        Success status or error information
+
+    """
+    try:
+        if name is None and description is None and todo_mode is None:
+            return {
+                "success": False,
+                "error": "At least one of name, description, or todo_mode must be provided",
+            }
+
+        if ctx:
+            await ctx.info(f"Updating list {list_id}")
+
+        result = await slack_client.update_list(
+            list_id=list_id,
+            name=name,
+            description=description,
+            todo_mode=todo_mode,
+        )
+
+        if ctx:
+            await ctx.info(f"Successfully updated list {list_id}")
+
+        return {
+            "success": True,
+            "list_id": list_id,
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating list: {e}")
+        if ctx:
+            await ctx.error(f"Failed to update list: {e!s}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
 # Add a resource to show server information
 @mcp.resource("resource://server/info")
 def get_server_info() -> dict[str, Any]:
@@ -621,6 +691,7 @@ def get_server_info() -> dict[str, Any]:
             "get_list_info",
             "get_list_structure",
             "create_list",
+            "update_list",
         ],
     }
 
