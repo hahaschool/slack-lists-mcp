@@ -848,6 +848,121 @@ class SlackListsClient:
             logger.error(f"Unexpected error creating list: {e}")
             raise
 
+    async def set_access(
+        self,
+        list_id: str,
+        access_level: str,
+        user_ids: list[str] | None = None,
+        channel_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Set access level for users or channels on a list.
+
+        Args:
+            list_id: The ID of the list
+            access_level: Permission level - 'read', 'write', or 'owner' (users only)
+            user_ids: List of user IDs to grant access (cannot use with channel_ids)
+            channel_ids: List of channel IDs to grant access (cannot use with user_ids)
+
+        Returns:
+            Success indicator
+
+        Note:
+            - Cannot specify both user_ids and channel_ids in the same call
+            - 'owner' access level only works with user_ids
+            - Only the current owner can designate another user as owner
+
+        """
+        try:
+            if not user_ids and not channel_ids:
+                raise ValueError("Either user_ids or channel_ids must be provided")
+            if user_ids and channel_ids:
+                raise ValueError("Cannot specify both user_ids and channel_ids")
+            if access_level not in ("read", "write", "owner"):
+                raise ValueError("access_level must be 'read', 'write', or 'owner'")
+            if access_level == "owner" and channel_ids:
+                raise ValueError("'owner' access level only works with user_ids")
+
+            request_data: dict[str, Any] = {
+                "list_id": list_id,
+                "access_level": access_level,
+            }
+
+            if user_ids:
+                request_data["user_ids"] = user_ids
+            if channel_ids:
+                request_data["channel_ids"] = channel_ids
+
+            response = self.client.api_call(
+                api_method="slackLists.access.set",
+                json=request_data,
+            )
+
+            if response.get("ok"):
+                return {"success": True}
+            raise SlackApiError(
+                message="Failed to set access",
+                response=response,
+            )
+
+        except SlackApiError as e:
+            error_response = self._handle_api_error(e)
+            raise Exception(f"Failed to set access: {error_response.error}")
+        except Exception as e:
+            logger.error(f"Unexpected error setting access: {e}")
+            raise
+
+    async def delete_access(
+        self,
+        list_id: str,
+        user_ids: list[str] | None = None,
+        channel_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Revoke access for users or channels from a list.
+
+        Args:
+            list_id: The ID of the list
+            user_ids: List of user IDs to revoke access (cannot use with channel_ids)
+            channel_ids: List of channel IDs to revoke access (cannot use with user_ids)
+
+        Returns:
+            Success indicator
+
+        Note:
+            Cannot specify both user_ids and channel_ids in the same call.
+
+        """
+        try:
+            if not user_ids and not channel_ids:
+                raise ValueError("Either user_ids or channel_ids must be provided")
+            if user_ids and channel_ids:
+                raise ValueError("Cannot specify both user_ids and channel_ids")
+
+            request_data: dict[str, Any] = {"list_id": list_id}
+
+            if user_ids:
+                request_data["user_ids"] = user_ids
+            if channel_ids:
+                request_data["channel_ids"] = channel_ids
+
+            response = self.client.api_call(
+                api_method="slackLists.access.delete",
+                json=request_data,
+            )
+
+            if response.get("ok"):
+                return {"success": True}
+            raise SlackApiError(
+                message="Failed to delete access",
+                response=response,
+            )
+
+        except SlackApiError as e:
+            error_response = self._handle_api_error(e)
+            raise Exception(f"Failed to delete access: {error_response.error}")
+        except Exception as e:
+            logger.error(f"Unexpected error deleting access: {e}")
+            raise
+
     async def update_list(
         self,
         list_id: str,

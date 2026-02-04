@@ -823,6 +823,150 @@ async def update_list(
         }
 
 
+@mcp.tool
+async def set_list_access(
+    list_id: Annotated[
+        str,
+        Field(description="The ID of the list to set access for"),
+    ],
+    access_level: Annotated[
+        str,
+        Field(
+            description="Permission level: 'read' (view only), 'write' (view and edit), or 'owner' (full control, users only)",
+        ),
+    ],
+    user_ids: Annotated[
+        list[str] | None,
+        Field(description="List of user IDs to grant access (cannot use with channel_ids)"),
+    ] = None,
+    channel_ids: Annotated[
+        list[str] | None,
+        Field(description="List of channel IDs to grant access (cannot use with user_ids)"),
+    ] = None,
+    ctx: Context = None,
+) -> dict[str, Any]:
+    """Set access level for users or channels on a Slack list.
+
+    Args:
+        list_id: The ID of the list
+        access_level: Permission level - 'read', 'write', or 'owner'
+        user_ids: User IDs to grant access (mutually exclusive with channel_ids)
+        channel_ids: Channel IDs to grant access (mutually exclusive with user_ids)
+        ctx: FastMCP context (automatically injected)
+
+    Returns:
+        Success status or error information
+
+    Note:
+        - Cannot specify both user_ids and channel_ids
+        - 'owner' access only works with user_ids
+
+    Example:
+        # Grant read access to users
+        set_list_access(list_id="F123", access_level="read", user_ids=["U123", "U456"])
+
+        # Grant write access to a channel
+        set_list_access(list_id="F123", access_level="write", channel_ids=["C123"])
+
+    """
+    try:
+        if ctx:
+            target = f"{len(user_ids)} users" if user_ids else f"{len(channel_ids)} channels"
+            await ctx.info(f"Setting {access_level} access for {target} on list {list_id}")
+
+        result = await slack_client.set_access(
+            list_id=list_id,
+            access_level=access_level,
+            user_ids=user_ids,
+            channel_ids=channel_ids,
+        )
+
+        if ctx:
+            await ctx.info(f"Successfully set access on list {list_id}")
+
+        return {
+            "success": True,
+            "list_id": list_id,
+            "access_level": access_level,
+        }
+
+    except Exception as e:
+        logger.error(f"Error setting list access: {e}")
+        if ctx:
+            await ctx.error(f"Failed to set access: {e!s}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+@mcp.tool
+async def delete_list_access(
+    list_id: Annotated[
+        str,
+        Field(description="The ID of the list to revoke access from"),
+    ],
+    user_ids: Annotated[
+        list[str] | None,
+        Field(description="List of user IDs to revoke access (cannot use with channel_ids)"),
+    ] = None,
+    channel_ids: Annotated[
+        list[str] | None,
+        Field(description="List of channel IDs to revoke access (cannot use with user_ids)"),
+    ] = None,
+    ctx: Context = None,
+) -> dict[str, Any]:
+    """Revoke access for users or channels from a Slack list.
+
+    Args:
+        list_id: The ID of the list
+        user_ids: User IDs to revoke access (mutually exclusive with channel_ids)
+        channel_ids: Channel IDs to revoke access (mutually exclusive with user_ids)
+        ctx: FastMCP context (automatically injected)
+
+    Returns:
+        Success status or error information
+
+    Note:
+        Cannot specify both user_ids and channel_ids in the same call.
+
+    Example:
+        # Revoke access from users
+        delete_list_access(list_id="F123", user_ids=["U123", "U456"])
+
+        # Revoke access from a channel
+        delete_list_access(list_id="F123", channel_ids=["C123"])
+
+    """
+    try:
+        if ctx:
+            target = f"{len(user_ids)} users" if user_ids else f"{len(channel_ids)} channels"
+            await ctx.info(f"Revoking access for {target} from list {list_id}")
+
+        result = await slack_client.delete_access(
+            list_id=list_id,
+            user_ids=user_ids,
+            channel_ids=channel_ids,
+        )
+
+        if ctx:
+            await ctx.info(f"Successfully revoked access from list {list_id}")
+
+        return {
+            "success": True,
+            "list_id": list_id,
+        }
+
+    except Exception as e:
+        logger.error(f"Error deleting list access: {e}")
+        if ctx:
+            await ctx.error(f"Failed to delete access: {e!s}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
 # Add a resource to show server information
 @mcp.resource("resource://server/info")
 def get_server_info() -> dict[str, Any]:
@@ -846,6 +990,8 @@ def get_server_info() -> dict[str, Any]:
             "get_list_structure",
             "create_list",
             "update_list",
+            "set_list_access",
+            "delete_list_access",
         ],
     }
 
