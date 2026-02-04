@@ -440,10 +440,16 @@ class SlackListsClient:
                                 break
                     items = filtered_items
 
+                # Extract pagination info from response_metadata (Slack API standard)
+                response_metadata = response.get("response_metadata", {})
+                next_cursor = response_metadata.get("next_cursor", "")
+                # has_more is determined by whether next_cursor is non-empty
+                has_more = bool(next_cursor)
+
                 return {
                     "items": items,
-                    "has_more": response.get("has_more", False),
-                    "next_cursor": response.get("next_cursor"),
+                    "has_more": has_more,
+                    "next_cursor": next_cursor if next_cursor else None,
                     "total": len(items),
                 }
 
