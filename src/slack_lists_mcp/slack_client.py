@@ -963,6 +963,100 @@ class SlackListsClient:
             logger.error(f"Unexpected error deleting access: {e}")
             raise
 
+    async def start_export(
+        self,
+        list_id: str,
+        include_archived: bool = False,
+    ) -> dict[str, Any]:
+        """Start an async export job for a list.
+
+        Args:
+            list_id: The ID of the list to export
+            include_archived: Whether to include archived items in the export
+
+        Returns:
+            Job information including job_id for polling
+
+        Note:
+            After starting an export, use get_export_url with the job_id
+            to retrieve the download URL once the job completes.
+
+        """
+        try:
+            request_data: dict[str, Any] = {"list_id": list_id}
+
+            if include_archived:
+                request_data["include_archived"] = include_archived
+
+            response = self.client.api_call(
+                api_method="slackLists.download.start",
+                json=request_data,
+            )
+
+            if response.get("ok"):
+                return {
+                    "job_id": response.get("job_id"),
+                    "list_id": list_id,
+                    "status": "started",
+                }
+            raise SlackApiError(
+                message="Failed to start export",
+                response=response,
+            )
+
+        except SlackApiError as e:
+            error_response = self._handle_api_error(e)
+            raise Exception(f"Failed to start export: {error_response.error}")
+        except Exception as e:
+            logger.error(f"Unexpected error starting export: {e}")
+            raise
+
+    async def get_export_url(
+        self,
+        list_id: str,
+        job_id: str,
+    ) -> dict[str, Any]:
+        """Get the download URL for a completed export job.
+
+        Args:
+            list_id: The ID of the list
+            job_id: The job ID from start_export
+
+        Returns:
+            Download URL and status information
+
+        Note:
+            The export job may still be processing. If so, retry after a short delay.
+
+        """
+        try:
+            response = self.client.api_call(
+                api_method="slackLists.download.get",
+                json={
+                    "list_id": list_id,
+                    "job_id": job_id,
+                },
+            )
+
+            if response.get("ok"):
+                return {
+                    "download_url": response.get("download_url"),
+                    "job_id": job_id,
+                    "list_id": list_id,
+                    "status": "completed" if response.get("download_url") else "processing",
+                }
+            raise SlackApiError(
+                message="Failed to get export URL",
+                response=response,
+            )
+
+        except SlackApiError as e:
+            error_response = self._handle_api_error(e)
+            raise Exception(f"Failed to get export URL: {error_response.error}")
+        except Exception as e:
+            logger.error(f"Unexpected error getting export URL: {e}")
+            raise
+
     async def update_list(
         self,
         list_id: str,

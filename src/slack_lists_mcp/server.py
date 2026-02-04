@@ -967,6 +967,131 @@ async def delete_list_access(
         }
 
 
+@mcp.tool
+async def start_list_export(
+    list_id: Annotated[
+        str,
+        Field(description="The ID of the list to export"),
+    ],
+    include_archived: Annotated[
+        bool,
+        Field(description="Whether to include archived items in the export"),
+    ] = False,
+    ctx: Context = None,
+) -> dict[str, Any]:
+    """Start an async export job for a Slack list.
+
+    This initiates an export job that runs asynchronously. After calling this,
+    use get_list_export_url with the returned job_id to retrieve the download URL.
+
+    Args:
+        list_id: The ID of the list to export
+        include_archived: Include archived items in export (default: False)
+        ctx: FastMCP context (automatically injected)
+
+    Returns:
+        Job information including job_id for polling
+
+    Example:
+        # Start export
+        result = start_list_export(list_id="F123")
+        job_id = result["job_id"]
+
+        # Then poll for completion
+        export = get_list_export_url(list_id="F123", job_id=job_id)
+
+    """
+    try:
+        if ctx:
+            await ctx.info(f"Starting export for list {list_id}")
+
+        result = await slack_client.start_export(
+            list_id=list_id,
+            include_archived=include_archived,
+        )
+
+        if ctx:
+            await ctx.info(f"Export job started: {result.get('job_id')}")
+
+        return {
+            "success": True,
+            "job_id": result.get("job_id"),
+            "list_id": list_id,
+            "status": "started",
+            "hint": "Use get_list_export_url with job_id to get the download URL",
+        }
+
+    except Exception as e:
+        logger.error(f"Error starting list export: {e}")
+        if ctx:
+            await ctx.error(f"Failed to start export: {e!s}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+@mcp.tool
+async def get_list_export_url(
+    list_id: Annotated[
+        str,
+        Field(description="The ID of the list"),
+    ],
+    job_id: Annotated[
+        str,
+        Field(description="The job ID from start_list_export"),
+    ],
+    ctx: Context = None,
+) -> dict[str, Any]:
+    """Get the download URL for a completed list export job.
+
+    Args:
+        list_id: The ID of the list
+        job_id: The job ID returned from start_list_export
+        ctx: FastMCP context (automatically injected)
+
+    Returns:
+        Download URL if ready, or processing status
+
+    Note:
+        If the job is still processing, retry after a short delay (e.g., 2-5 seconds).
+
+    Example:
+        result = get_list_export_url(list_id="F123", job_id="LeF123...")
+        if result["status"] == "completed":
+            download_url = result["download_url"]
+
+    """
+    try:
+        if ctx:
+            await ctx.info(f"Getting export URL for job {job_id}")
+
+        result = await slack_client.get_export_url(
+            list_id=list_id,
+            job_id=job_id,
+        )
+
+        if ctx:
+            await ctx.info(f"Export status: {result.get('status')}")
+
+        return {
+            "success": True,
+            "download_url": result.get("download_url"),
+            "job_id": job_id,
+            "list_id": list_id,
+            "status": result.get("status"),
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting export URL: {e}")
+        if ctx:
+            await ctx.error(f"Failed to get export URL: {e!s}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
 # Add a resource to show server information
 @mcp.resource("resource://server/info")
 def get_server_info() -> dict[str, Any]:
@@ -992,6 +1117,8 @@ def get_server_info() -> dict[str, Any]:
             "update_list",
             "set_list_access",
             "delete_list_access",
+            "start_list_export",
+            "get_list_export_url",
         ],
     }
 
