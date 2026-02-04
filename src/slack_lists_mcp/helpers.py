@@ -4,7 +4,38 @@ These utilities simplify the creation of properly formatted field values
 for the Slack Lists API.
 """
 
+from enum import Enum
 from typing import Any
+
+
+class FieldType(str, Enum):
+    """Supported Slack Lists field types."""
+
+    TEXT = "text"
+    SELECT = "select"
+    USER = "user"
+    DATE = "date"
+    NUMBER = "number"
+    CHECKBOX = "checkbox"
+    LINK = "link"
+    EMAIL = "email"
+    PHONE = "phone"
+    RATING = "rating"
+    TIMESTAMP = "timestamp"
+    CHANNEL = "channel"
+    ATTACHMENT = "attachment"
+    MESSAGE = "message"
+    VOTE = "vote"
+    CANVAS = "canvas"
+    REFERENCE = "reference"
+
+
+class AccessLevel(str, Enum):
+    """Slack Lists access levels."""
+
+    READ = "read"
+    WRITE = "write"
+    OWNER = "owner"
 
 
 def make_rich_text(text: str) -> list[dict[str, Any]]:
@@ -229,10 +260,141 @@ def make_phone(phones: str | list[str]) -> list[str]:
     return list(phones)
 
 
+def make_attachment(file_ids: str | list[str]) -> list[str]:
+    """Create a properly formatted attachment field value.
+
+    Args:
+        file_ids: Single file ID or list of file IDs
+
+    Returns:
+        List of file IDs ready for Slack API
+
+    Example:
+        >>> field = {"column_id": "Col123", "attachment": make_attachment("F1234567890")}
+
+    """
+    if isinstance(file_ids, str):
+        return [file_ids]
+    return list(file_ids)
+
+
+def make_message(permalinks: str | list[str]) -> list[str]:
+    """Create a properly formatted message field value.
+
+    Args:
+        permalinks: Single Slack message permalink or list of permalinks
+
+    Returns:
+        List of message permalinks ready for Slack API
+
+    Example:
+        >>> field = {"column_id": "Col123", "message": make_message("https://team.slack.com/archives/C123/p123")}
+
+    """
+    if isinstance(permalinks, str):
+        return [permalinks]
+    return list(permalinks)
+
+
+def make_vote(vote_value: int) -> list[int]:
+    """Create a properly formatted vote field value.
+
+    Args:
+        vote_value: Vote count or value
+
+    Returns:
+        List containing the vote value ready for Slack API
+
+    Example:
+        >>> field = {"column_id": "Col123", "vote": make_vote(5)}
+
+    """
+    return [int(vote_value)]
+
+
+def make_canvas(canvas_ids: str | list[str]) -> list[str]:
+    """Create a properly formatted canvas field value.
+
+    Args:
+        canvas_ids: Single canvas ID or list of canvas IDs
+
+    Returns:
+        List of canvas IDs ready for Slack API
+
+    Example:
+        >>> field = {"column_id": "Col123", "canvas": make_canvas("F1234567890")}
+
+    """
+    if isinstance(canvas_ids, str):
+        return [canvas_ids]
+    return list(canvas_ids)
+
+
+def extract_text(rich_text: list[dict[str, Any]] | None) -> str:
+    """Extract plain text from Slack rich_text Block Kit format.
+
+    This is useful for reading item values returned by the API,
+    which are in rich_text format, and converting them to plain text.
+
+    Args:
+        rich_text: Rich text blocks from Slack API response
+
+    Returns:
+        Extracted plain text string
+
+    Example:
+        >>> item = await client.get_item(list_id="F123", item_id="Rec123")
+        >>> for field in item["item"]["fields"]:
+        ...     if "rich_text" in field:
+        ...         text = extract_text(field["rich_text"])
+        ...         print(text)
+
+    """
+    if not rich_text:
+        return ""
+
+    texts = []
+    for block in rich_text:
+        if block.get("type") == "rich_text":
+            for element in block.get("elements", []):
+                if element.get("type") == "rich_text_section":
+                    for sub_element in element.get("elements", []):
+                        if sub_element.get("type") == "text":
+                            texts.append(sub_element.get("text", ""))
+                        elif sub_element.get("type") == "link":
+                            # Include link text or URL
+                            texts.append(
+                                sub_element.get("text", sub_element.get("url", ""))
+                            )
+                        elif sub_element.get("type") == "user":
+                            texts.append(f"<@{sub_element.get('user_id', '')}>")
+                        elif sub_element.get("type") == "channel":
+                            texts.append(f"<#{sub_element.get('channel_id', '')}>")
+                elif element.get("type") == "rich_text_list":
+                    # Handle bulleted/numbered lists
+                    for item in element.get("elements", []):
+                        if item.get("type") == "rich_text_section":
+                            for sub_element in item.get("elements", []):
+                                if sub_element.get("type") == "text":
+                                    texts.append(sub_element.get("text", ""))
+                elif element.get("type") == "rich_text_preformatted":
+                    # Handle code blocks
+                    for sub_element in element.get("elements", []):
+                        if sub_element.get("type") == "text":
+                            texts.append(sub_element.get("text", ""))
+                elif element.get("type") == "rich_text_quote":
+                    # Handle quotes
+                    for sub_element in element.get("elements", []):
+                        if sub_element.get("type") == "text":
+                            texts.append(sub_element.get("text", ""))
+
+    return "".join(texts)
+
+
 def make_field(
     column_id: str,
     value: Any,
-    field_type: str = "text",
+    field_type: str | FieldType = "text",
 ) -> dict[str, Any]:
     """Create a complete field dictionary for add/update operations.
 
@@ -243,7 +405,8 @@ def make_field(
         column_id: The column ID from list structure
         value: The value to set (auto-formatted based on field_type)
         field_type: One of: text, select, user, date, number, checkbox,
-                   link, email, phone, rating, timestamp, channel
+                   link, email, phone, rating, timestamp, channel,
+                   attachment, message, vote, canvas
 
     Returns:
         Complete field dictionary ready for initial_fields or cells
@@ -254,10 +417,15 @@ def make_field(
         ...     make_field("Col2", "U123456", "user"),
         ...     make_field("Col3", True, "checkbox"),
         ...     make_field("Col4", 4, "rating"),
+        ...     make_field("Col5", "F123", FieldType.ATTACHMENT),
         ... ]
 
     """
     field: dict[str, Any] = {"column_id": column_id}
+
+    # Convert FieldType enum to string if needed
+    if isinstance(field_type, FieldType):
+        field_type = field_type.value
 
     if field_type == "text":
         field["rich_text"] = make_rich_text(str(value))
@@ -285,9 +453,17 @@ def make_field(
         else:
             field["link"] = value
     elif field_type == "email":
-        field["email"] = [value] if isinstance(value, str) else list(value)
+        field["email"] = make_email(value)
     elif field_type == "phone":
-        field["phone"] = [value] if isinstance(value, str) else list(value)
+        field["phone"] = make_phone(value)
+    elif field_type == "attachment":
+        field["attachment"] = make_attachment(value)
+    elif field_type == "message":
+        field["message"] = make_message(value)
+    elif field_type == "vote":
+        field["vote"] = make_vote(value)
+    elif field_type == "canvas":
+        field["canvas"] = make_canvas(value)
     else:
         # For unknown types, set directly
         field[field_type] = value

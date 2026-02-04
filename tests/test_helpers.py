@@ -308,3 +308,267 @@ def test_make_field_channel():
 
     assert result["column_id"] == "Col123"
     assert result["channel"] == ["C123456"]
+
+
+# Tests for new field types (vote, canvas, attachment, message)
+
+
+def test_make_attachment_single():
+    """Test attachment field with single file ID."""
+    from slack_lists_mcp.helpers import make_attachment
+
+    result = make_attachment("F1234567890")
+    assert result == ["F1234567890"]
+
+
+def test_make_attachment_list():
+    """Test attachment field with list of file IDs."""
+    from slack_lists_mcp.helpers import make_attachment
+
+    result = make_attachment(["F123", "F456"])
+    assert result == ["F123", "F456"]
+
+
+def test_make_message_single():
+    """Test message field with single permalink."""
+    from slack_lists_mcp.helpers import make_message
+
+    result = make_message("https://team.slack.com/archives/C123/p123")
+    assert result == ["https://team.slack.com/archives/C123/p123"]
+
+
+def test_make_message_list():
+    """Test message field with list of permalinks."""
+    from slack_lists_mcp.helpers import make_message
+
+    result = make_message(["https://slack.com/1", "https://slack.com/2"])
+    assert result == ["https://slack.com/1", "https://slack.com/2"]
+
+
+def test_make_vote():
+    """Test vote field creation."""
+    from slack_lists_mcp.helpers import make_vote
+
+    result = make_vote(5)
+    assert result == [5]
+
+
+def test_make_vote_float():
+    """Test vote field with float (converts to int)."""
+    from slack_lists_mcp.helpers import make_vote
+
+    result = make_vote(3.7)
+    assert result == [3]
+
+
+def test_make_canvas_single():
+    """Test canvas field with single canvas ID."""
+    from slack_lists_mcp.helpers import make_canvas
+
+    result = make_canvas("F1234567890")
+    assert result == ["F1234567890"]
+
+
+def test_make_canvas_list():
+    """Test canvas field with list of canvas IDs."""
+    from slack_lists_mcp.helpers import make_canvas
+
+    result = make_canvas(["F123", "F456"])
+    assert result == ["F123", "F456"]
+
+
+def test_make_field_attachment():
+    """Test make_field with attachment type."""
+    result = make_field("Col123", "F1234567890", "attachment")
+
+    assert result["column_id"] == "Col123"
+    assert result["attachment"] == ["F1234567890"]
+
+
+def test_make_field_message():
+    """Test make_field with message type."""
+    result = make_field("Col123", "https://slack.com/archives/C123/p123", "message")
+
+    assert result["column_id"] == "Col123"
+    assert result["message"] == ["https://slack.com/archives/C123/p123"]
+
+
+def test_make_field_vote():
+    """Test make_field with vote type."""
+    result = make_field("Col123", 5, "vote")
+
+    assert result["column_id"] == "Col123"
+    assert result["vote"] == [5]
+
+
+def test_make_field_canvas():
+    """Test make_field with canvas type."""
+    result = make_field("Col123", "F1234567890", "canvas")
+
+    assert result["column_id"] == "Col123"
+    assert result["canvas"] == ["F1234567890"]
+
+
+# Tests for FieldType enum
+
+
+def test_field_type_enum():
+    """Test FieldType enum values."""
+    from slack_lists_mcp.helpers import FieldType
+
+    assert FieldType.TEXT.value == "text"
+    assert FieldType.SELECT.value == "select"
+    assert FieldType.USER.value == "user"
+    assert FieldType.VOTE.value == "vote"
+    assert FieldType.CANVAS.value == "canvas"
+
+
+def test_make_field_with_enum():
+    """Test make_field accepts FieldType enum."""
+    from slack_lists_mcp.helpers import FieldType
+
+    result = make_field("Col123", "U123456", FieldType.USER)
+
+    assert result["column_id"] == "Col123"
+    assert result["user"] == ["U123456"]
+
+
+# Tests for AccessLevel enum
+
+
+def test_access_level_enum():
+    """Test AccessLevel enum values."""
+    from slack_lists_mcp.helpers import AccessLevel
+
+    assert AccessLevel.READ.value == "read"
+    assert AccessLevel.WRITE.value == "write"
+    assert AccessLevel.OWNER.value == "owner"
+
+
+# Tests for extract_text helper
+
+
+def test_extract_text_simple():
+    """Test extract_text with simple text."""
+    from slack_lists_mcp.helpers import extract_text
+
+    rich_text = [
+        {
+            "type": "rich_text",
+            "elements": [
+                {
+                    "type": "rich_text_section",
+                    "elements": [{"type": "text", "text": "Hello World"}],
+                },
+            ],
+        },
+    ]
+
+    result = extract_text(rich_text)
+    assert result == "Hello World"
+
+
+def test_extract_text_multiple_sections():
+    """Test extract_text with multiple text sections."""
+    from slack_lists_mcp.helpers import extract_text
+
+    rich_text = [
+        {
+            "type": "rich_text",
+            "elements": [
+                {
+                    "type": "rich_text_section",
+                    "elements": [
+                        {"type": "text", "text": "Hello "},
+                        {"type": "text", "text": "World"},
+                    ],
+                },
+            ],
+        },
+    ]
+
+    result = extract_text(rich_text)
+    assert result == "Hello World"
+
+
+def test_extract_text_with_link():
+    """Test extract_text with link element."""
+    from slack_lists_mcp.helpers import extract_text
+
+    rich_text = [
+        {
+            "type": "rich_text",
+            "elements": [
+                {
+                    "type": "rich_text_section",
+                    "elements": [
+                        {"type": "text", "text": "Click "},
+                        {"type": "link", "text": "here", "url": "https://example.com"},
+                    ],
+                },
+            ],
+        },
+    ]
+
+    result = extract_text(rich_text)
+    assert result == "Click here"
+
+
+def test_extract_text_with_user_mention():
+    """Test extract_text with user mention."""
+    from slack_lists_mcp.helpers import extract_text
+
+    rich_text = [
+        {
+            "type": "rich_text",
+            "elements": [
+                {
+                    "type": "rich_text_section",
+                    "elements": [
+                        {"type": "text", "text": "Hello "},
+                        {"type": "user", "user_id": "U123456"},
+                    ],
+                },
+            ],
+        },
+    ]
+
+    result = extract_text(rich_text)
+    assert result == "Hello <@U123456>"
+
+
+def test_extract_text_empty():
+    """Test extract_text with empty input."""
+    from slack_lists_mcp.helpers import extract_text
+
+    assert extract_text(None) == ""
+    assert extract_text([]) == ""
+
+
+def test_extract_text_with_list():
+    """Test extract_text with rich_text_list element."""
+    from slack_lists_mcp.helpers import extract_text
+
+    rich_text = [
+        {
+            "type": "rich_text",
+            "elements": [
+                {
+                    "type": "rich_text_list",
+                    "elements": [
+                        {
+                            "type": "rich_text_section",
+                            "elements": [{"type": "text", "text": "Item 1"}],
+                        },
+                        {
+                            "type": "rich_text_section",
+                            "elements": [{"type": "text", "text": "Item 2"}],
+                        },
+                    ],
+                },
+            ],
+        },
+    ]
+
+    result = extract_text(rich_text)
+    assert result == "Item 1Item 2"
