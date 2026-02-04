@@ -23,10 +23,14 @@ RETRYABLE_ERRORS = frozenset({
 # Human-readable error messages for common Slack API errors
 ERROR_MESSAGES = {
     "invalid_arguments": "Invalid parameters provided. Check field formats and required values.",
+    "invalid_request": "Malformed request or missing required parameters.",
     "list_not_found": "List not found. The list may have been deleted or you don't have access.",
     "item_not_found": "Item not found in the list. It may have been deleted.",
+    "not_found": "Resource not found. The requested item, list, or resource doesn't exist.",
     "access_denied": "Access denied. You don't have permission to perform this action.",
     "rate_limited": "Rate limited. Too many requests - please wait and retry.",
+    "ratelimited": "Rate limited. Too many requests - please wait and retry.",
+    "too_many_requests": "Too many requests. Please slow down and retry.",
     "not_authed": "Authentication failed. Check your Slack bot token.",
     "invalid_auth": "Invalid authentication. The token may be revoked or invalid.",
     "account_inactive": "The Slack account is inactive or deleted.",
@@ -40,6 +44,8 @@ ERROR_MESSAGES = {
     "ekm_access_denied": "Access denied by Enterprise Key Management.",
     "invalid_cursor": "Invalid pagination cursor. Start from the beginning.",
     "fatal_error": "A fatal server error occurred. Please try again later.",
+    "invalid_blocks": "Invalid Block Kit formatting in text fields. Check rich_text structure.",
+    "failed_to_parse_block_kit": "Block Kit parsing error. Ensure rich_text follows Block Kit format.",
 }
 
 
@@ -178,6 +184,8 @@ class SlackListsClient:
             "timestamp",
             "channel",
             "reference",
+            "vote",
+            "canvas",
         ]
 
         normalized = []
@@ -802,6 +810,10 @@ class SlackListsClient:
             return field["channel"]
         if "reference" in field:
             return field["reference"]
+        if "vote" in field:
+            return field["vote"]
+        if "canvas" in field:
+            return field["canvas"]
         if "rich_text" in field:
             return field["rich_text"]
         if "value" in field:
