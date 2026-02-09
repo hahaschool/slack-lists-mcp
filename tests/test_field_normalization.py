@@ -205,3 +205,131 @@ async def test_field_normalization_handles_checkbox(mock_slack_client):
 
     assert normalized_fields[0]["checkbox"] is True
     assert normalized_fields[1]["checkbox"] is False
+
+
+@pytest.mark.asyncio
+async def test_message_field_url_string_wrapped(mock_slack_client):
+    """Test that a single message URL string is wrapped in an array."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={"ok": True, "item": {"id": "Rec123"}},
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    result = await client.add_item(
+        list_id="F123",
+        initial_fields=[
+            {
+                "column_id": "Col123",
+                "message": "https://team.slack.com/archives/C03HDDKH82J/p1770618111689629",
+            },
+        ],
+    )
+
+    assert result["id"] == "Rec123"
+
+    actual_call = mock_slack_client.api_call.call_args
+    normalized_fields = actual_call[1]["json"]["initial_fields"]
+
+    assert isinstance(normalized_fields[0]["message"], list)
+    assert normalized_fields[0]["message"] == [
+        "https://team.slack.com/archives/C03HDDKH82J/p1770618111689629"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_message_field_structured_to_url(mock_slack_client):
+    """Test that structured message objects are converted to permalink URLs."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={"ok": True, "item": {"id": "Rec123"}},
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+    # Pre-set workspace URL to avoid auth.test call
+    client._workspace_url = "https://myteam.slack.com"
+
+    result = await client.add_item(
+        list_id="F123",
+        initial_fields=[
+            {
+                "column_id": "Col123",
+                "message": {"channel_id": "C03HDDKH82J", "ts": "1770618111.689629"},
+            },
+        ],
+    )
+
+    assert result["id"] == "Rec123"
+
+    actual_call = mock_slack_client.api_call.call_args
+    normalized_fields = actual_call[1]["json"]["initial_fields"]
+
+    assert isinstance(normalized_fields[0]["message"], list)
+    assert normalized_fields[0]["message"] == [
+        "https://myteam.slack.com/archives/C03HDDKH82J/p1770618111689629"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_message_field_array_mixed_conversion(mock_slack_client):
+    """Test that mixed arrays of URLs and structured objects are all converted."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={"ok": True, "item": {"id": "Rec123"}},
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+    client._workspace_url = "https://myteam.slack.com"
+
+    result = await client.add_item(
+        list_id="F123",
+        initial_fields=[
+            {
+                "column_id": "Col123",
+                "message": [
+                    "https://myteam.slack.com/archives/C111/p1234567890123456",
+                    {"channel_id": "C222", "ts": "9876543210.654321"},
+                ],
+            },
+        ],
+    )
+
+    assert result["id"] == "Rec123"
+
+    actual_call = mock_slack_client.api_call.call_args
+    normalized_fields = actual_call[1]["json"]["initial_fields"]
+
+    assert normalized_fields[0]["message"] == [
+        "https://myteam.slack.com/archives/C111/p1234567890123456",
+        "https://myteam.slack.com/archives/C222/p9876543210654321",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_message_field_url_array_preserved(mock_slack_client):
+    """Test that a correctly formatted URL array is preserved as-is."""
+    mock_slack_client.api_call = MagicMock(
+        return_value={"ok": True, "item": {"id": "Rec123"}},
+    )
+
+    client = SlackListsClient()
+    client.client = mock_slack_client
+
+    url = "https://team.slack.com/archives/C03HDDKH82J/p1770618111689629"
+    result = await client.add_item(
+        list_id="F123",
+        initial_fields=[
+            {
+                "column_id": "Col123",
+                "message": [url],
+            },
+        ],
+    )
+
+    assert result["id"] == "Rec123"
+
+    actual_call = mock_slack_client.api_call.call_args
+    normalized_fields = actual_call[1]["json"]["initial_fields"]
+
+    assert normalized_fields[0]["message"] == [url]

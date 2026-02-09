@@ -66,6 +66,40 @@ class SlackListsClient:
             timeout=settings.slack_api_timeout,
         )
         self.retry_count = settings.slack_retry_count
+        self._workspace_url: str | None = None
+
+    def _get_workspace_url(self) -> str:
+        """Get the workspace URL, fetching from Slack API on first call.
+
+        Returns:
+            Workspace URL like 'https://myteam.slack.com'
+
+        """
+        if self._workspace_url is None:
+            try:
+                response = self.client.auth_test()
+                url = response.get("url", "")
+                # Remove trailing slash
+                self._workspace_url = url.rstrip("/")
+            except SlackApiError:
+                logger.warning("Failed to fetch workspace URL via auth.test")
+                self._workspace_url = "https://app.slack.com"
+        return self._workspace_url
+
+    def _message_to_url(self, item: dict[str, Any]) -> str:
+        """Convert a structured message object to a Slack permalink URL.
+
+        Args:
+            item: Dict with 'channel_id' and 'ts' keys
+
+        Returns:
+            Slack permalink URL string
+
+        """
+        channel_id = item["channel_id"]
+        ts = str(item["ts"]).replace(".", "")
+        workspace_url = self._get_workspace_url()
+        return f"{workspace_url}/archives/{channel_id}/p{ts}"
 
     def _handle_api_error(self, e: SlackApiError) -> ErrorResponse:
         """Handle Slack API errors consistently.
@@ -235,6 +269,29 @@ class SlackListsClient:
                         else:
                             formatted_links.append(item)
                     normalized_field["link"] = formatted_links
+
+            # Handle message fields - convert structured objects to permalink URLs
+            if "message" in normalized_field:
+                msg_value = normalized_field["message"]
+                if isinstance(msg_value, str):
+                    # Single URL string → wrap in array
+                    normalized_field["message"] = [msg_value]
+                elif isinstance(msg_value, dict):
+                    # Structured object {"channel_id": "C...", "ts": "123.456"} → URL
+                    if "channel_id" in msg_value and "ts" in msg_value:
+                        normalized_field["message"] = [self._message_to_url(msg_value)]
+                    else:
+                        normalized_field["message"] = [msg_value]
+                elif isinstance(msg_value, list):
+                    formatted_messages = []
+                    for item in msg_value:
+                        if isinstance(item, str):
+                            formatted_messages.append(item)
+                        elif isinstance(item, dict) and "channel_id" in item and "ts" in item:
+                            formatted_messages.append(self._message_to_url(item))
+                        else:
+                            formatted_messages.append(item)
+                    normalized_field["message"] = formatted_messages
 
             normalized.append(normalized_field)
 
